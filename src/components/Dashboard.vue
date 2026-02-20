@@ -1,0 +1,967 @@
+<template>
+  <div class="container" :style="{ '--grid-columns': authStore.gridColumns }">
+    <!-- Tabs -->
+    <div class="tabs">
+      <button :class="{ active: currentTab === 'items' }" @click="currentTab = 'items'">
+        <Package :size="18" style="vertical-align: middle; margin-right: 4px;" /> Items
+      </button>
+      <button :class="{ active: currentTab === 'categories' }" @click="currentTab = 'categories'">
+        <Tag :size="18" style="vertical-align: middle; margin-right: 4px;" /> Categories
+      </button>
+      <button :class="{ active: currentTab === 'loans' }" @click="currentTab = 'loans'">
+        <Users :size="18" style="vertical-align: middle; margin-right: 4px;" /> Loans
+      </button>
+    </div>
+
+    <!-- Items Tab -->
+    <div v-if="currentTab === 'items'">
+      <div class="card filter-bar">
+        <button v-if="authStore.editMode" class="btn-primary" style="white-space: nowrap;" @click="openItemModal()">
+          <Plus :size="20" style="vertical-align: middle;" /> Add Item
+        </button>
+        <input v-model="searchQuery" type="text" placeholder="Search items..." />
+        
+        <CategoryFilter 
+          v-model:selectedIds="selectedCategoryIds" 
+          v-model:mode="filterMode" 
+          :categories="visibleCategories" 
+          style="flex: 1;"
+        />
+        <div class="selection-count">
+          <span class="count-value">{{ totalIndividualItems }}</span>
+          <span class="count-label">{{ totalIndividualItems === 1 ? 'item' : 'items' }}</span>
+        </div>
+      </div>
+
+      <div v-if="loading && items.length === 0" class="silver-text">Loading items...</div>
+      <div v-else-if="filteredItems.length === 0" class="silver-text">No items found.</div>
+      
+      <div class="grid">
+        <div v-for="item in filteredItems" :key="item.id" class="item-card">
+          <div @click="viewItemDetails(item)" style="cursor: pointer;">
+            <div class="item-image-wrapper">
+              <div class="quantity-badge">{{ item.quantity }}</div>
+              <img v-if="item.image" :src="item.image" />
+              <div v-else style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;">
+                <Package :size="32" :stroke-width="1.5" class="silver-text" style="opacity: 0.8;" />
+              </div>
+              <h3 class="item-title-overlay">
+                <Lock v-if="item.private" :size="12" color="#f59e0b" style="margin-right: 4px; vertical-align: middle;" />
+                {{ item.name }}
+              </h3>
+            </div>
+
+            <div class="item-stats-row" v-if="isDefined(item.joy) || isDefined(item.usageFrequency) || isDefined(item.intention) || isDefined(item.attachment)">
+              <div v-if="isDefined(item.joy)" class="item-stat" title="Joy">
+                <Smile :size="14" /> <span>{{ formatStat(item.joy) }}</span>
+              </div>
+              <div v-if="isDefined(item.usageFrequency)" class="item-stat" title="Usage">
+                <Zap :size="14" /> <span>{{ formatStat(item.usageFrequency) }}</span>
+              </div>
+              <div v-if="isDefined(item.intention)" class="item-stat" title="Intention">
+                <Target :size="14" /> <span>{{ formatStat(item.intention) }}</span>
+              </div>
+              <div v-if="isDefined(item.attachment)" class="item-stat" title="Attachment">
+                <Heart :size="14" /> <span>{{ formatStat(item.attachment) }}</span>
+              </div>
+            </div>
+            
+            <div v-if="item.categoryIds && item.categoryIds.length > 0">
+              <span v-for="catId in item.categoryIds" :key="catId" class="item-badge" 
+                :style="{ backgroundColor: getCategoryColor(catId) + '11', color: getCategoryColor(catId), cursor: 'pointer' }"
+                @click.stop="toggleFilterCategory(catId)">
+                {{ getCategoryName(catId) }}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Categories Tab -->
+    <div v-if="currentTab === 'categories'">
+      <div class="card filter-bar">
+        <button v-if="authStore.editMode" class="btn-primary" style="width: auto;" @click="openCategoryModal()">
+          <Plus :size="20" style="vertical-align: middle;" /> Add Category
+        </button>
+      </div>
+      
+      <div v-if="categories.length === 0" class="silver-text">No categories created yet.</div>
+      
+      <div class="grid">
+        <div v-for="cat in visibleCategories" :key="cat.id" class="item-card" @click="authStore.editMode && openCategoryModal(cat)" :style="{ borderColor: cat.color || 'var(--border-color)', cursor: authStore.editMode ? 'pointer' : 'default' }">
+          <h3 :style="{ color: cat.color || 'var(--accent-purple)', margin: '0 0 8px 0' }">
+            <Lock v-if="cat.isPrivate" :size="14" :color="cat.private ? '#ef4444' : '#f59e0b'" style="margin-right: 6px; vertical-align: middle;" />
+            {{ cat.name }}
+          </h3>
+          <p class="silver-text" style="font-size: 0.9rem; margin-bottom: 8px;">{{ cat.description || 'No description' }}</p>
+          <div class="item-stats-row" style="margin-top: auto;">
+            <div class="item-stat" title="Items">
+              <Package :size="14" /> <span>{{ cat.count }}</span>
+            </div>
+            <div v-if="cat.intentionalCount" class="item-stat" title="Target">
+              <Target :size="14" /> <span>{{ cat.intentionalCount }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Loans Tab -->
+    <div v-if="currentTab === 'loans'">
+      <div v-if="loans.length === 0" class="silver-text">No active loans.</div>
+      
+      <div v-for="loan in loans" :key="loan.id" class="card" style="border-left: 4px solid var(--accent-purple); padding: 12px; margin-bottom: 12px;">
+        <div style="display: flex; justify-content: space-between;">
+          <div>
+            <h3 class="accent-text" style="margin: 0 0 4px 0;">{{ getItemName(loan.itemId) }}</h3>
+            <p class="silver-text" style="margin: 0 0 2px 0;">Borrowed by: <strong>{{ loan.borrower }}</strong></p>
+            <p class="silver-text" style="margin: 0 0 2px 0;">Quantity: {{ loan.quantity }}</p>
+            <p class="silver-text" style="font-size: 0.8rem; margin: 0 0 2px 0;">Lent at: {{ new Date(loan.lentAt).toLocaleDateString() }}</p>
+            <p v-if="loan.note" class="silver-text" style="font-size: 0.8rem; font-style: italic; margin: 4px 0 0 0;">Note: {{ loan.note }}</p>
+          </div>
+          <div class="actions" style="flex-direction: column; gap: 8px;">
+            <button v-if="authStore.editMode && !loan.returnedAt" class="btn-primary btn-small" @click="returnLoan(loan.id)">Return</button>
+            <span v-else class="silver-text"><CheckCircle :size="16" /> Returned</span>
+            <button v-if="authStore.editMode" class="btn-danger btn-small" @click="deleteLoan(loan.id)">Delete</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Item Modal -->
+    <div v-if="authStore.editMode && showItemModal" class="modal-overlay" @click.self="showItemModal = false">
+      <div class="modal-content">
+        <X class="modal-close" :size="20" @click="showItemModal = false" />
+        <h2 class="accent-text">{{ editingItem ? 'Edit Item' : 'Add New Item' }}</h2>
+        <form @submit.prevent="saveItem()">
+          <div class="form-group">
+            <label>Name</label>
+            <input v-model="itemForm.name" ref="itemNameInput" type="text" required />
+            <div v-if="closeMatches.length > 0" class="close-matches-list">
+              <div v-for="match in closeMatches" :key="match.id" class="close-match-item">
+                <span class="match-name">{{ match.name }}</span>
+                <span v-if="match.categoryIds?.[0]" class="match-category">
+                  ({{ getCategoryName(match.categoryIds[0]) }})
+                </span>
+              </div>
+            </div>
+          </div>
+          
+          <div class="form-group">
+            <label>Image</label>
+            <div style="text-align: center;">
+              <input type="file" ref="fileInputRef" accept="image/*" capture="environment" @change="handleFileChange" style="display: none;" />
+              <button type="button" class="btn-secondary" style="width: 100%; margin-bottom: 10px;" @click="triggerFileInput">
+                <Camera :size="20" style="vertical-align: middle; margin-right: 8px;" />
+                {{ preview ? 'Change Photo' : 'Take Picture' }}
+              </button>
+              <img v-if="preview" :src="preview" style="max-width: 100%; border-radius: 8px; margin-top: 10px;" />
+              <button v-if="preview" type="button" class="btn-danger btn-small" style="margin-top: 5px;" @click="removeImage">Remove Image</button>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr; gap: 15px;">
+            <div class="form-group">
+              <label>Quantity</label>
+              <input v-model="itemForm.quantity" type="number" step="any" :disabled="!!editingItem" />
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Categories</label>
+            <div style="display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 10px;">
+              <div v-for="cat in categories" :key="cat.id" 
+                   class="item-badge" 
+                   :style="{ cursor: 'pointer', backgroundColor: itemForm.categoryIds.includes(cat.id) ? (cat.color || 'var(--accent-purple)') : 'var(--input-bg)', color: itemForm.categoryIds.includes(cat.id) ? 'white' : 'var(--accent-silver)' }"
+                   @click="toggleCategory(cat.id)">
+                {{ cat.name }}
+              </div>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+            <div class="form-group">
+              <label>Usage Frequency</label>
+              <select v-model="itemForm.usageFrequency">
+                <option v-for="opt in usageFrequencies" :key="opt" :value="opt">{{ opt }}</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Attachment</label>
+              <select v-model="itemForm.attachment">
+                <option v-for="opt in attachments" :key="opt" :value="opt">{{ opt }}</option>
+              </select>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+            <div class="form-group">
+              <label>Intention</label>
+              <select v-model="itemForm.intention">
+                <option v-for="opt in intentions" :key="opt" :value="opt">{{ opt }}</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Joy</label>
+              <select v-model="itemForm.joy">
+                <option v-for="opt in joys" :key="opt" :value="opt">{{ opt }}</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="actions">
+            <button type="submit" class="btn-primary" :disabled="saving" style="flex: 1; width: auto;">{{ saving ? 'Saving...' : 'Save' }}</button>
+            <button v-if="!editingItem" type="button" class="btn-secondary" :disabled="saving" @click="saveItem(true)" style="flex: 1;">
+              {{ saving ? 'Saving...' : 'Save and Next' }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Category Modal -->
+    <div v-if="authStore.editMode && showCategoryModal" class="modal-overlay" @click.self="showCategoryModal = false">
+      <div class="modal-content">
+        <X class="modal-close" :size="20" @click="showCategoryModal = false" />
+        <h2 class="accent-text">{{ editingCategory ? 'Edit Category' : 'Add Category' }}</h2>
+        <form @submit.prevent="saveCategory">
+          <div class="form-group">
+            <label>Name</label>
+            <input v-model="categoryForm.name" type="text" required />
+          </div>
+          <div class="form-group">
+            <label>Description</label>
+            <textarea v-model="categoryForm.description"></textarea>
+          </div>
+          <div class="form-group">
+            <label>Color</label>
+            <input v-model="categoryForm.color" type="color" style="height: 40px; padding: 2px;" />
+          </div>
+          <div class="form-group">
+            <label>Private</label>
+            <select v-model="categoryForm.private">
+              <option :value="false">No</option>
+              <option :value="true">Yes</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Target Count (Optional)</label>
+            <input v-model="categoryForm.intentionalCount" type="number" />
+          </div>
+          <div class="form-group">
+            <label>Parent Category</label>
+            <select v-model="categoryForm.parentId" @change="onParentCategoryChange">
+              <option :value="null">None</option>
+              <option v-for="cat in sortedCategories.filter(c => c.id !== editingCategory?.id)" :key="cat.id" :value="cat.id">
+                {{ getCategoryDisplayName(cat) }}
+              </option>
+            </select>
+          </div>
+          <div class="actions">
+            <button type="submit" class="btn-primary" :disabled="saving">Save</button>
+            <button v-if="editingCategory" type="button" class="btn-danger" title="Delete" @click="deleteCategory(editingCategory.id); showCategoryModal = false" style="margin-left: auto;">
+              <Trash2 :size="18" />
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Transaction Modal -->
+    <div v-if="authStore.editMode && showTransactionModal" class="modal-overlay" @click.self="showTransactionModal = false">
+      <div class="modal-content">
+        <X class="modal-close" :size="20" @click="showTransactionModal = false" />
+        <h2 class="accent-text">Adjust Quantity: {{ selectedItem?.name }}</h2>
+        <p class="silver-text">Current Quantity: {{ selectedItem?.quantity }}</p>
+        <form @submit.prevent="saveTransaction">
+          <div class="form-group">
+            <label>Change (Positive or Negative)</label>
+            <input v-model="transactionForm.delta" type="number" step="any" required />
+          </div>
+          <div class="form-group">
+            <label>Note (Optional)</label>
+            <input v-model="transactionForm.note" type="text" />
+          </div>
+          <div class="actions">
+            <button type="submit" class="btn-primary" :disabled="saving">Update</button>
+          </div>
+        </form>
+
+        <div v-if="selectedItem?.transactions" style="margin-top: 20px;">
+          <h4 class="silver-text">Recent Transactions</h4>
+          <div v-for="t in selectedItem.transactions" :key="t.id" style="font-size: 0.8rem; padding: 5px; border-bottom: 1px solid #444;">
+            <span :class="t.delta > 0 ? 'accent-text' : 'error-text'">{{ t.delta > 0 ? '+' : '' }}{{ t.delta }}</span>
+            <span style="margin-left: 10px;">{{ t.note || 'No note' }}</span>
+            <span class="silver-text" style="float: right;">{{ new Date(t.createdAt).toLocaleDateString() }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Loan Modal -->
+    <div v-if="authStore.editMode && showLoanModal" class="modal-overlay" @click.self="showLoanModal = false">
+      <div class="modal-content">
+        <X class="modal-close" :size="20" @click="showLoanModal = false" />
+        <h2 class="accent-text">Lend Item: {{ selectedItem?.name }}</h2>
+        <form @submit.prevent="saveLoan">
+          <div class="form-group">
+            <label>Borrower Name</label>
+            <input v-model="loanForm.borrower" type="text" required />
+          </div>
+          <div class="form-group">
+            <label>Quantity</label>
+            <input v-model="loanForm.quantity" type="number" step="any" required />
+          </div>
+          <div class="form-group">
+            <label>Note</label>
+            <input v-model="loanForm.note" type="text" />
+          </div>
+          <div class="actions">
+            <button type="submit" class="btn-primary" :disabled="saving">Lend</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Item Detail Modal -->
+    <div v-if="showDetailModal" class="modal-overlay" @click.self="showDetailModal = false">
+      <div class="modal-content" style="max-width: 500px;">
+        <X class="modal-close" :size="20" @click="showDetailModal = false" />
+        <h2 class="app-title" style="margin-bottom: 20px;">
+          <Lock v-if="selectedItem?.private" :size="20" style="margin-right: 8px; vertical-align: middle; color: #f59e0b;" />
+          {{ selectedItem?.name }}
+        </h2>
+        
+        <img v-if="selectedItem?.image" :src="selectedItem.image" style="width: 100%; border-radius: 12px; margin-bottom: 20px;" />
+        <div v-else style="width: 100%; aspect-ratio: 1/1; display: flex; align-items: center; justify-content: center; background-color: var(--input-bg); border-radius: 12px; margin-bottom: 20px;">
+          <Package :size="64" :stroke-width="1.5" class="silver-text" style="opacity: 0.8;" />
+        </div>
+        
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-label">Quantity</div>
+            <div class="stat-value">{{ selectedItem?.quantity }}</div>
+          </div>
+          <div v-if="isDefined(selectedItem?.usageFrequency)" class="stat-card">
+            <div class="stat-label">Usage</div>
+            <div class="stat-value">{{ formatStat(selectedItem?.usageFrequency) }}</div>
+          </div>
+          <div v-if="isDefined(selectedItem?.joy)" class="stat-card">
+            <div class="stat-label">Joy</div>
+            <div class="stat-value">{{ formatStat(selectedItem?.joy) }}</div>
+          </div>
+          <div v-if="isDefined(selectedItem?.intention)" class="stat-card">
+            <div class="stat-label">Intention</div>
+            <div class="stat-value">{{ formatStat(selectedItem?.intention) }}</div>
+          </div>
+          <div v-if="isDefined(selectedItem?.attachment)" class="stat-card">
+            <div class="stat-label">Attachment</div>
+            <div class="stat-value">{{ formatStat(selectedItem?.attachment) }}</div>
+          </div>
+        </div>
+
+        <div v-if="selectedItem?.categoryIds && selectedItem.categoryIds.length > 0" style="margin-top: 20px;">
+           <span v-for="catId in selectedItem.categoryIds" :key="catId" class="category-tag" 
+             :style="{ backgroundColor: getCategoryColor(catId), color: 'white', cursor: 'pointer' }"
+             @click.stop="toggleFilterCategory(catId)">
+             {{ getCategoryName(catId) }}
+           </span>
+        </div>
+
+        <div v-if="authStore.editMode" class="actions" style="margin-top: 30px; border-top: 1px solid var(--border-color); padding-top: 20px;">
+          <button class="btn-secondary" title="Edit" @click="openItemModal(selectedItem); showDetailModal = false">
+            <Edit2 :size="18" style="vertical-align: middle; margin-right: 8px;" /> Edit
+          </button>
+          <button class="btn-secondary" title="Transactions" @click="openTransactionModal(selectedItem); showDetailModal = false">
+            <ArrowRightLeft :size="18" style="vertical-align: middle; margin-right: 8px;" /> Transactions
+          </button>
+          <button class="btn-secondary" title="Lend" @click="openLoanModal(selectedItem); showDetailModal = false">
+            <Users :size="18" style="vertical-align: middle; margin-right: 8px;" /> Lend
+          </button>
+          <button class="btn-danger" title="Delete" @click="confirmDeleteItem(selectedItem.id); showDetailModal = false" style="margin-left: auto;">
+            <Trash2 :size="18" />
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Camera Modal -->
+    <div v-if="showCameraModal" class="modal-overlay" @click.self="closeCamera">
+      <div class="modal-content" style="max-width: 600px; padding: 20px; text-align: center;">
+        <X class="modal-close" :size="20" @click="closeCamera" />
+        <h2 class="accent-text" style="margin-top: 0;">Capture Photo</h2>
+        <div style="position: relative; width: 100%; aspect-ratio: 4/3; background: #000; border-radius: 12px; overflow: hidden; margin-bottom: 20px;">
+          <video ref="videoRef" autoplay playsinline style="width: 100%; height: 100%; object-fit: cover;"></video>
+          <canvas ref="canvasRef" style="display: none;"></canvas>
+        </div>
+        <div class="actions" style="justify-content: center;">
+          <button type="button" class="btn-primary" @click="capturePhoto" style="width: auto;">
+            <Camera :size="20" style="vertical-align: middle; margin-right: 8px;" />
+            Capture
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref, onMounted, onUnmounted, computed, nextTick, watch } from 'vue';
+import axios from 'axios';
+import { useAuthStore } from '../stores/auth';
+import CategoryFilter from './CategoryFilter.vue';
+import { useCategories } from '../composables/useCategories';
+import { useItems } from '../composables/useItems';
+import { formatStat, isDefined } from '../utils/formatters';
+import {
+  Plus, Edit2, Trash2, Camera,
+  ArrowRightLeft, Package, Tag, Users,
+  CheckCircle, X, Lock,
+  Smile, Zap, Target, Heart
+} from 'lucide-vue-next';
+
+const authStore = useAuthStore();
+const { categories, fetchCategories, getCategoryName, getCategoryColor } = useCategories();
+const { 
+  items, loading, selectedCategoryIds, filterMode, searchQuery, 
+  fetchItems, filteredItems, totalIndividualItems
+} = useItems(categories);
+
+const saving = ref(false);
+
+const currentTab = ref('items');
+const loans = ref<any[]>([]);
+
+// Modals state
+const showItemModal = ref(false);
+const showCategoryModal = ref(false);
+const showTransactionModal = ref(false);
+const showLoanModal = ref(false);
+const showDetailModal = ref(false);
+const showCameraModal = ref(false);
+
+const selectedItem = ref<any>(null);
+const editingItem = ref<any>(null);
+const editingCategory = ref<any>(null);
+
+// Forms
+const itemForm = ref({
+  name: '',
+  quantity: 0,
+  usageFrequency: 'undefined',
+  attachment: 'undefined',
+  intention: 'undecided',
+  joy: 'medium',
+  categoryIds: [] as string[]
+});
+
+const categoryForm = ref({
+  name: '',
+  description: '',
+  color: '#9d50bb',
+  intentionalCount: null as number | null,
+  parentId: null as string | null,
+  private: false
+});
+
+const transactionForm = ref({
+  delta: 0,
+  note: ''
+});
+
+const loanForm = ref({
+  borrower: '',
+  quantity: 1,
+  note: ''
+});
+
+const fileInputRef = ref<HTMLInputElement | null>(null);
+const videoRef = ref<HTMLVideoElement | null>(null);
+const canvasRef = ref<HTMLCanvasElement | null>(null);
+const itemNameInput = ref<HTMLInputElement | null>(null);
+const file = ref<File | null>(null);
+const preview = ref<string | null>(null);
+const stream = ref<MediaStream | null>(null);
+
+// Enums
+const usageFrequencies = ['undefined', 'daily', 'weekly', 'monthly', 'yearly', 'seasonal', 'unused'];
+const attachments = ['undefined', 'replacable', 'some', 'strong', 'sentimental'];
+const intentions = ['undecided', 'keep', 'sell', 'donate', 'maintain', 'upgrade', 'dispose'];
+const joys = ['low', 'medium', 'high'];
+
+watch([showItemModal, showCategoryModal, showTransactionModal, showLoanModal, showDetailModal, showCameraModal], (vals) => {
+  if (vals.some(v => v)) {
+    document.body.classList.add('modal-open');
+  } else {
+    nextTick(() => {
+      if (document.querySelectorAll('.modal-overlay').length === 0) {
+        document.body.classList.remove('modal-open');
+      }
+    });
+  }
+});
+
+onUnmounted(() => {
+  nextTick(() => {
+    if (document.querySelectorAll('.modal-overlay').length === 0) {
+      document.body.classList.remove('modal-open');
+    }
+  });
+});
+
+// Computed
+const closeMatches = computed(() => {
+  const name = itemForm.value.name.trim().toLowerCase();
+  if (name.length < 2) return [];
+  
+  return items.value
+    .filter(item => {
+      if (editingItem.value && item.id === editingItem.value.id) return false;
+      return item.name.toLowerCase().includes(name);
+    })
+    .slice(0, 5);
+});
+
+const visibleCategories = computed(() => {
+  return authStore.showPrivate ? categories.value : categories.value.filter(c => !c.private);
+});
+
+const sortedCategories = computed(() => {
+  let cats = categories.value;
+  if (!authStore.showPrivate) {
+    cats = cats.filter(c => !c.private);
+  }
+
+  const result: any[] = [];
+  const addChildren = (parentId: string | null, level: number) => {
+    const children = cats
+      .filter(c => (c.parentId || null) === parentId)
+      .sort((a, b) => a.name.localeCompare(b.name));
+    
+    for (const child of children) {
+      result.push({ ...child, level });
+      addChildren(child.id, level + 1);
+    }
+  };
+  addChildren(null, 0);
+  
+  // Add any categories that might have been missed (e.g. circular dependency or missing parent)
+  const addedIds = new Set(result.map(c => c.id));
+  const missed = cats.filter(c => !addedIds.has(c.id));
+  for (const cat of missed) {
+    result.push({ ...cat, level: 0 });
+  }
+  
+  return result;
+});
+
+watch(() => authStore.showPrivate, () => {
+  fetchData();
+});
+
+// Fetching
+const fetchData = async () => {
+  const headers: any = { 
+    'Authorization': `Bearer ${authStore.token}`
+  };
+  
+  const [_, __, loansRes] = await Promise.all([
+    fetchCategories(),
+    fetchItems(),
+    axios.get('/api/loans', { headers })
+  ]);
+  
+  loans.value = (loansRes as any).data;
+};
+
+// Item Actions
+const openItemModal = (item: any = null, keepImage = false) => {
+  if (!authStore.editMode) return;
+  editingItem.value = item;
+  if (!keepImage) {
+    preview.value = item?.image || null;
+    file.value = null;
+  }
+  
+  if (item) {
+    itemForm.value = {
+      name: item.name,
+      quantity: item.quantity,
+      usageFrequency: item.usageFrequency,
+      attachment: item.attachment,
+      intention: item.intention,
+      joy: item.joy,
+      categoryIds: [...(item.categoryIds || [])]
+    };
+  } else {
+    itemForm.value = {
+      name: '',
+      quantity: 1,
+      usageFrequency: 'undefined',
+      attachment: 'undefined',
+      intention: 'undecided',
+      joy: 'medium',
+      categoryIds: []
+    };
+  }
+  showItemModal.value = true;
+  nextTick(() => {
+    itemNameInput.value?.focus();
+  });
+};
+
+
+const triggerFileInput = () => startCamera();
+
+const handleFileChange = (e: any) => {
+  const selectedFile = e.target.files[0];
+  if (selectedFile) {
+    file.value = selectedFile;
+    const reader = new FileReader();
+    reader.onload = (e) => preview.value = e.target?.result as string;
+    reader.readAsDataURL(selectedFile);
+  }
+};
+
+const removeImage = () => {
+  file.value = null;
+  preview.value = null;
+};
+
+const startCamera = async () => {
+  try {
+    // Check if getUserMedia is supported
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      throw new Error('Camera not supported');
+    }
+    
+    showCameraModal.value = true;
+    await nextTick();
+    
+    stream.value = await navigator.mediaDevices.getUserMedia({ 
+      video: { facingMode: 'environment' }, 
+      audio: false 
+    });
+    
+    if (videoRef.value) {
+      videoRef.value.srcObject = stream.value;
+    }
+  } catch (err) {
+    console.error('Failed to start camera', err);
+    showCameraModal.value = false;
+    // Fallback to file input
+    fileInputRef.value?.click();
+  }
+};
+
+const stopCamera = () => {
+  if (stream.value) {
+    stream.value.getTracks().forEach(track => track.stop());
+    stream.value = null;
+  }
+};
+
+const closeCamera = () => {
+  stopCamera();
+  showCameraModal.value = false;
+};
+
+const capturePhoto = () => {
+  if (videoRef.value && canvasRef.value) {
+    const video = videoRef.value;
+    const canvas = canvasRef.value;
+    
+    // Use video dimensions
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+      
+      preview.value = dataUrl;
+      
+      // Convert to blob and file
+      const parts = dataUrl.split(',');
+      const byteString = atob(parts[1] || '');
+      const mimeString = (parts[0] || '').split(':')[1]?.split(';')[0] || 'image/jpeg';
+      const ab = new ArrayBuffer(byteString.length);
+      const ia = new Uint8Array(ab);
+      for (let i = 0; i < byteString.length; i++) {
+        ia[i] = byteString.charCodeAt(i);
+      }
+      const blob = new Blob([ab], { type: mimeString });
+      file.value = new File([blob], 'captured_photo.jpg', { type: 'image/jpeg' });
+      
+      closeCamera();
+    }
+  }
+};
+
+const toggleCategory = (catId: string) => {
+  const idx = itemForm.value.categoryIds.indexOf(catId);
+  if (idx > -1) itemForm.value.categoryIds.splice(idx, 1);
+  else itemForm.value.categoryIds.push(catId);
+};
+
+const saveItem = async (stay = false) => {
+  if (!authStore.editMode) return;
+  saving.value = true;
+  try {
+    const formData = new FormData();
+    Object.entries(itemForm.value).forEach(([key, val]) => {
+      if (key === 'categoryIds') formData.append(key, JSON.stringify(val));
+      else formData.append(key, val as any);
+    });
+    
+    if (file.value) formData.append('image', file.value);
+    else if (!preview.value && editingItem.value?.image) formData.append('removeImage', 'true');
+
+    const headers: any = { 
+      'Authorization': `Bearer ${authStore.token}`,
+      'Content-Type': 'multipart/form-data'
+    };
+
+    if (editingItem.value) {
+      await axios.put(`/api/items/${editingItem.value.id}`, formData, { headers });
+    } else {
+      await axios.post('/api/items', formData, { headers });
+    }
+    
+    if (stay) {
+      itemForm.value = {
+        name: '',
+        quantity: 1,
+        usageFrequency: 'undefined',
+        attachment: 'undefined',
+        intention: 'undecided',
+        joy: 'medium',
+        categoryIds: []
+      };
+      file.value = null;
+      preview.value = null;
+      nextTick(() => {
+        itemNameInput.value?.focus();
+      });
+    } else {
+      showItemModal.value = false;
+    }
+    await fetchData();
+  } catch (err) {
+    alert('Failed to save item');
+  } finally {
+    saving.value = false;
+  }
+};
+
+const viewItemDetails = async (item: any) => {
+  try {
+    const headers: any = { 
+      'Authorization': `Bearer ${authStore.token}`
+    };
+    const res = await axios.get(`/api/items/${item.id}`, { headers });
+    selectedItem.value = res.data;
+    showDetailModal.value = true;
+  } catch (err) {
+    console.error(err);
+  }
+};
+
+const confirmDeleteItem = async (id: string) => {
+  if (!authStore.editMode) return;
+  if (confirm('Are you sure you want to delete this item?')) {
+    try {
+      await axios.delete(`/api/items/${id}`, {
+        headers: { 'Authorization': `Bearer ${authStore.token}` }
+      });
+      await fetchData();
+    } catch (err) {
+      alert('Failed to delete item');
+    }
+  }
+};
+
+// Category Actions
+const toggleFilterCategory = (catId: string) => {
+  const idx = selectedCategoryIds.value.indexOf(catId);
+  if (idx > -1) {
+    selectedCategoryIds.value.splice(idx, 1);
+  } else {
+    selectedCategoryIds.value.push(catId);
+  }
+  currentTab.value = 'items';
+  showDetailModal.value = false;
+};
+
+
+const openCategoryModal = (cat: any = null) => {
+  if (!authStore.editMode) return;
+  editingCategory.value = cat;
+  if (cat) {
+    categoryForm.value = {
+      name: cat.name,
+      description: cat.description || '',
+      color: cat.color || '#9d50bb',
+      intentionalCount: cat.intentionalCount,
+      parentId: cat.parentId || null,
+      private: cat.private || false
+    };
+  } else {
+    categoryForm.value = {
+      name: '',
+      description: '',
+      color: '#9d50bb',
+      intentionalCount: null,
+      parentId: null,
+      private: false
+    };
+  }
+  showCategoryModal.value = true;
+};
+
+const saveCategory = async () => {
+  if (!authStore.editMode) return;
+  saving.value = true;
+  try {
+    const headers = { 'Authorization': `Bearer ${authStore.token}` };
+    if (editingCategory.value) {
+      await axios.put(`/api/categories/${editingCategory.value.id}`, categoryForm.value, { headers });
+    } else {
+      await axios.post('/api/categories', categoryForm.value, { headers });
+    }
+    showCategoryModal.value = false;
+    await fetchData();
+  } catch (err) {
+    alert('Failed to save category');
+  } finally {
+    saving.value = false;
+  }
+};
+
+const deleteCategory = async (id: string) => {
+  if (!authStore.editMode) return;
+  if (confirm('Are you sure? This will remove the category from all items.')) {
+    try {
+      await axios.delete(`/api/categories/${id}`, {
+        headers: { 'Authorization': `Bearer ${authStore.token}` }
+      });
+      await fetchData();
+    } catch (err) {
+      alert('Failed to delete category');
+    }
+  }
+};
+
+const onParentCategoryChange = () => {
+  if (categoryForm.value.parentId) {
+    categoryForm.value.private = true;
+  }
+};
+
+// Transaction Actions
+const openTransactionModal = async (item: any) => {
+  if (!authStore.editMode) return;
+  selectedItem.value = item;
+  transactionForm.value = { delta: 0, note: '' };
+  
+  // Fetch latest transactions
+  try {
+    const headers: any = { 
+      'Authorization': `Bearer ${authStore.token}`
+    };
+    const res = await axios.get(`/api/items/${item.id}`, { headers });
+    selectedItem.value = res.data;
+  } catch (err) {}
+  
+  showTransactionModal.value = true;
+};
+
+const saveTransaction = async () => {
+  if (!authStore.editMode) return;
+  if (transactionForm.value.delta === 0) return;
+  saving.value = true;
+  try {
+    await axios.post(`/api/items/${selectedItem.value.id}/transactions`, transactionForm.value, {
+      headers: { 'Authorization': `Bearer ${authStore.token}` }
+    });
+    showTransactionModal.value = false;
+    await fetchData();
+  } catch (err) {
+    alert('Failed to update quantity');
+  } finally {
+    saving.value = false;
+  }
+};
+
+// Loan Actions
+const openLoanModal = (item: any) => {
+  if (!authStore.editMode) return;
+  selectedItem.value = item;
+  loanForm.value = { borrower: '', quantity: 1, note: '' };
+  showLoanModal.value = true;
+};
+
+const saveLoan = async () => {
+  if (!authStore.editMode) return;
+  saving.value = true;
+  try {
+    await axios.post(`/api/items/${selectedItem.value.id}/loans`, loanForm.value, {
+      headers: { 'Authorization': `Bearer ${authStore.token}` }
+    });
+    showLoanModal.value = false;
+    await fetchData();
+  } catch (err) {
+    alert('Failed to create loan');
+  } finally {
+    saving.value = false;
+  }
+};
+
+const returnLoan = async (id: string) => {
+  if (!authStore.editMode) return;
+  try {
+    await axios.post(`/api/loans/${id}/return`, {}, {
+      headers: { 'Authorization': `Bearer ${authStore.token}` }
+    });
+    await fetchData();
+  } catch (err) {
+    alert('Failed to return loan');
+  }
+};
+
+const deleteLoan = async (id: string) => {
+  if (!authStore.editMode) return;
+  if (confirm('Delete this loan record?')) {
+    try {
+      await axios.delete(`/api/loans/${id}`, {
+        headers: { 'Authorization': `Bearer ${authStore.token}` }
+      });
+      await fetchData();
+    } catch (err) {
+      alert('Failed to delete loan');
+    }
+  }
+};
+
+
+
+// Helpers
+const getCategoryDisplayName = (cat: any) => {
+  const level = cat.level || 0;
+  return '\u00A0\u00A0'.repeat(level) + cat.name;
+};
+
+const getItemName = (id: string) => items.value.find(i => i.id === id)?.name || 'Unknown Item';
+
+
+onMounted(() => {
+  fetchData();
+});
+
+onUnmounted(() => {
+  stopCamera();
+});
+</script>

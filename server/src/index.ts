@@ -1,0 +1,458 @@
+import express from 'express';
+import dotenv from 'dotenv';
+import knex from 'knex';
+import { PostgresUserRepository, PostgresItemRepository, PostgresCategoryRepository, PostgresQuantityTransactionRepository, PostgresLoanRepository } from './repositories/postgres.js';
+import { InMemoryUserRepository, InMemoryItemRepository, InMemoryCategoryRepository, InMemoryQuantityTransactionRepository, InMemoryLoanRepository } from './repositories/inMemory.js';
+import { AuthService } from './services/auth.js';
+import { ItemService } from './services/items.js';
+import { CategoryService } from './services/categories.js';
+import { LoanService } from './services/loans.js';
+import { authMiddleware, AuthRequest } from './middleware/auth.js';
+import { encryptionMiddleware, EncryptionRequest } from './middleware/encryption.js';
+import { deriveKey } from './services/encryption.js';
+import multer from 'multer';
+import session from 'express-session';
+
+declare module 'express-session' {
+  interface SessionData {
+    encryptionKey?: string;
+    privateUnlocked?: boolean;
+  }
+}
+
+dotenv.config();
+
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { categories as fixtureCategories, subCategories as fixtureSubCategories, items as fixtureItems, generatePlaceholderImage } from './fixtures.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const app = express();
+app.use(express.json());
+
+app.use(session({
+    secret: process.env.SESSION_SECRET || 'session-secret',
+    resave: false,
+    saveUninitialized: true,
+    cookie: { secure: false } // In a real app with HTTPS, set this to true
+}));
+
+// Serve static files from the 'public' directory
+app.use(express.static(path.join(__dirname, '../../public')));
+
+const upload = multer({ storage: multer.memoryStorage() });
+
+const usePostgres = process.env.DB_TYPE === 'postgres';
+let userRepository: any;
+let itemRepository: any;
+let categoryRepository: any;
+let transactionRepository: any;
+let loanRepository: any;
+
+let authService: AuthService;
+let itemService: ItemService;
+let categoryService: CategoryService;
+let loanService: LoanService;
+
+async function initDB() {
+    if (usePostgres) {
+        const db = knex({
+            client: 'pg',
+            connection: process.env.DATABASE_URL || 'postgres://user:password@localhost:5432/minventorydb'
+        });
+
+        // Run migrations
+        try {
+            await db.migrate.latest({
+                directory: path.join(__dirname, '../migrations'),
+                loadExtensions: ['.js', '.ts']
+            });
+            console.log('PostgreSQL migrations completed.');
+        } catch (err) {
+            console.error('PostgreSQL migration failed:', err);
+            // Don't exit here, maybe we can still start? 
+            // Actually for dev/prod stability, if Postgres is requested but fails to migrate, we should probably know.
+        }
+
+        userRepository = new PostgresUserRepository(db);
+        itemRepository = new PostgresItemRepository(db);
+        categoryRepository = new PostgresCategoryRepository(db);
+        transactionRepository = new PostgresQuantityTransactionRepository(db);
+        loanRepository = new PostgresLoanRepository(db);
+    } else {
+        userRepository = new InMemoryUserRepository();
+        itemRepository = new InMemoryItemRepository();
+        categoryRepository = new InMemoryCategoryRepository();
+        transactionRepository = new InMemoryQuantityTransactionRepository();
+        loanRepository = new InMemoryLoanRepository();
+    }
+
+    authService = new AuthService(userRepository);
+    itemService = new ItemService(itemRepository, userRepository, categoryRepository, transactionRepository, loanRepository);
+    categoryService = new CategoryService(categoryRepository, itemRepository);
+    loanService = new LoanService(loanRepository, itemRepository);
+
+    // Auto-seed in-memory database if empty
+    if (!usePostgres) {
+        const username = 'admin';
+        const password = 'password123';
+        const existing = await userRepository.findByUsername(username);
+        if (!existing) {
+            console.log('Seeding in-memory database with more sample data...');
+            const user = await authService.register(username, password);
+            const key = deriveKey(password, user.encryptionKeySalt);
+            
+            // Create categories
+            const allCategories: any[] = [];
+            for (const cat of fixtureCategories) {
+                const id: string = await (categoryService as any).createCategory(user.id, key, { 
+                    name: cat.name, 
+                    color: cat.color, 
+                    private: cat.private 
+                });
+                allCategories.push({ ...cat, id });
+            }
+            
+            // Create subcategories
+            for (const sub of fixtureSubCategories) {
+                const parentCat: any = allCategories.find(c => c.name === sub.parentName);
+                const subId: string = await (categoryService as any).createCategory(user.id, key, { 
+                    name: sub.name, 
+                    parentId: parentCat ? parentCat.id : null, 
+                    color: sub.color, 
+                    private: sub.private 
+                });
+                allCategories.push({ ...sub, id: subId });
+            }
+
+            const cats = await (categoryService as any).getCategories(user.id, key, true);
+            const getCatId = (name: string) => (cats as any[]).find(c => c.name === name)?.id;
+            
+            for (const itemInfo of fixtureItems) {
+                const imageData = await (generatePlaceholderImage as any)(itemInfo.name);
+                const categoryIds = (itemInfo.categories as string[]).map(name => getCatId(name)).filter(Boolean);
+                
+                const itemId = await itemService.createItem(user.id, key, { 
+                    name: itemInfo.name, 
+                    categoryIds,
+                    quantity: itemInfo.quantity,
+                    usageFrequency: itemInfo.usageFrequency,
+                    attachment: itemInfo.attachment,
+                    intention: itemInfo.intention,
+                    joy: itemInfo.joy
+                }, imageData.imageBlob);
+
+                if (itemInfo.loan) {
+                    await loanService.createLoan(user.id, itemId, {
+                        borrower: itemInfo.loan.borrower,
+                        note: itemInfo.loan.note,
+                        quantity: itemInfo.quantity
+                    });
+                }
+            }
+            console.log('In-memory seeding complete.');
+        }
+    }
+}
+
+await initDB();
+
+// Auth routes
+app.post('/api/auth/register', async (req, res) => {
+    try {
+        const { username, password } = req.body;
+        const user = await authService.register(username, password);
+        res.status(201).json({ message: 'User registered' });
+    } catch (err: any) {
+        res.status(400).json({ error: err.message });
+    }
+});
+
+app.post('/api/auth/login', async (req, res) => {
+    try {
+        const { username, password } = req.body;
+        const { user, requires2FA } = await authService.login(username, password);
+        const token = authService.generateToken(user, !requires2FA);
+        
+        // Derive encryption key and store in session
+        const key = deriveKey(password, user.encryptionKeySalt);
+        req.session.encryptionKey = key.toString('hex');
+        req.session.privateUnlocked = false;
+        
+        res.json({ token, requires2FA });
+    } catch (err: any) {
+        res.status(401).json({ error: err.message });
+    }
+});
+
+app.post('/api/auth/logout', (req, res) => {
+    req.session.destroy((err) => {
+        if (err) {
+            return res.status(500).json({ error: 'Could not log out' });
+        }
+        res.json({ message: 'Logged out' });
+    });
+});
+
+app.post('/api/auth/setup-2fa', authMiddleware, async (req: AuthRequest, res) => {
+    try {
+        const user = await userRepository.findById(req.user!.id);
+        if (!user) return res.status(404).json({ error: 'User not found' });
+        const data = await authService.generate2FA(user);
+        res.json(data);
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/auth/verify-2fa', authMiddleware, async (req: AuthRequest, res) => {
+    try {
+        const { token } = req.body;
+        const user = await userRepository.findById(req.user!.id);
+        if (!user) return res.status(404).json({ error: 'User not found' });
+        
+        const isValid = await authService.verify2FA(user, token);
+        if (isValid) {
+            const newToken = authService.generateToken(user, true);
+            res.json({ token: newToken });
+        } else {
+            res.status(400).json({ error: 'Invalid token' });
+        }
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/auth/unlock-private', authMiddleware, async (req: AuthRequest, res) => {
+    try {
+        const { password } = req.body;
+        const user = await userRepository.findById(req.user!.id);
+        if (!user) return res.status(404).json({ error: 'User not found' });
+
+        const isValid = await authService.verifyPassword(user, password);
+        if (isValid) {
+            req.session.privateUnlocked = true;
+            res.json({ message: 'Private items unlocked' });
+        } else {
+            res.status(401).json({ error: 'Invalid password' });
+        }
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Item routes
+app.get('/api/items', authMiddleware, encryptionMiddleware, async (req: any, res) => {
+    try {
+        const ereq = req as EncryptionRequest;
+        const showPrivate = ereq.session.privateUnlocked || false;
+        const categoryId = ereq.query.categoryId as string | undefined;
+        
+        const items = await itemService.getItems(ereq.user!.id, ereq.encryptionKey, showPrivate, categoryId);
+        res.json(items);
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.get('/api/items/:id', authMiddleware, encryptionMiddleware, async (req: any, res) => {
+    try {
+        const ereq = req as EncryptionRequest;
+        const showPrivate = ereq.session.privateUnlocked || false;
+        
+        const item = await itemService.getItem(ereq.user!.id, ereq.encryptionKey, ereq.params.id as string, showPrivate);
+        res.json(item);
+    } catch (err: any) {
+        res.status(404).json({ error: err.message });
+    }
+});
+
+// Image streaming routes (async, cached)
+app.get('/api/items/:id/thumb', authMiddleware, encryptionMiddleware, async (req: any, res) => {
+    try {
+        const ereq = req as EncryptionRequest;
+        const data = await itemService.getItemThumbnail(ereq.user!.id, ereq.encryptionKey, ereq.params.id as string);
+        if (!data) return res.sendStatus(404);
+
+        const etag = 'W/"' + (ereq.query.v || '') + String(ereq.params.id) + '"';
+        if (ereq.headers['if-none-match'] === etag) return res.sendStatus(304);
+
+        res.setHeader('Content-Type', data.mime || 'image/webp');
+        if (ereq.query.v) {
+            res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+            res.setHeader('ETag', etag);
+        } else {
+            res.setHeader('Cache-Control', 'public, max-age=300');
+        }
+        res.end(data.buffer);
+    } catch (err: any) {
+        res.status(500).json({ error: 'Failed to load thumbnail' });
+    }
+});
+
+app.get('/api/items/:id/image', authMiddleware, encryptionMiddleware, async (req: any, res) => {
+    try {
+        const ereq = req as EncryptionRequest;
+        const data = await itemService.getItemImage(ereq.user!.id, ereq.encryptionKey, ereq.params.id as string);
+        if (!data) return res.sendStatus(404);
+
+        const etag = 'W/"' + (ereq.query.v || '') + String(ereq.params.id) + '"';
+        if (ereq.headers['if-none-match'] === etag) return res.sendStatus(304);
+
+        res.setHeader('Content-Type', data.mime || 'image/webp');
+        if (ereq.query.v) {
+            res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+            res.setHeader('ETag', etag);
+        } else {
+            res.setHeader('Cache-Control', 'public, max-age=300');
+        }
+        res.end(data.buffer);
+    } catch (err: any) {
+        res.status(500).json({ error: 'Failed to load image' });
+    }
+});
+
+app.post('/api/items', authMiddleware, encryptionMiddleware, upload.single('image'), async (req: any, res) => {
+    try {
+        const ereq = req as EncryptionRequest;
+        const imageBuffer = ereq.file?.buffer;
+        const itemId = await itemService.createItem(ereq.user!.id, ereq.encryptionKey, ereq.body, imageBuffer);
+        res.status(201).json({ id: itemId, message: 'Item created' });
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.put('/api/items/:id', authMiddleware, encryptionMiddleware, upload.single('image'), async (req: any, res) => {
+    try {
+        const ereq = req as EncryptionRequest;
+        const imageBuffer = ereq.file?.buffer;
+        await itemService.updateItem(ereq.user!.id, ereq.encryptionKey, ereq.params.id as string, ereq.body, imageBuffer);
+        res.json({ message: 'Item updated' });
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.delete('/api/items/:id', authMiddleware, async (req: AuthRequest, res) => {
+    try {
+        await itemService.deleteItem(req.user!.id, req.params.id as string);
+        res.json({ message: 'Item deleted' });
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/items/:id/transactions', authMiddleware, async (req: AuthRequest, res) => {
+    try {
+        const { delta, note } = req.body;
+        await itemService.addTransaction(req.user!.id, req.params.id as string, parseFloat(delta), note);
+        res.status(201).json({ message: 'Transaction added' });
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Category routes
+app.get('/api/categories', authMiddleware, encryptionMiddleware, async (req: any, res) => {
+    try {
+        const ereq = req as EncryptionRequest;
+        const showPrivate = ereq.session.privateUnlocked || false;
+        const categories = await categoryService.getCategories(ereq.user!.id, ereq.encryptionKey, showPrivate);
+        res.json(categories);
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/categories', authMiddleware, encryptionMiddleware, async (req: any, res) => {
+    try {
+        const ereq = req as EncryptionRequest;
+        const categoryId = await categoryService.createCategory(ereq.user!.id, ereq.encryptionKey, ereq.body);
+        res.status(201).json({ id: categoryId, message: 'Category created' });
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.put('/api/categories/:id', authMiddleware, encryptionMiddleware, async (req: any, res) => {
+    try {
+        const ereq = req as EncryptionRequest;
+        await categoryService.updateCategory(ereq.user!.id, ereq.encryptionKey, ereq.params.id as string, ereq.body);
+        res.json({ message: 'Category updated' });
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.delete('/api/categories/:id', authMiddleware, async (req: AuthRequest, res) => {
+    try {
+        await categoryService.deleteCategory(req.user!.id, req.params.id as string);
+        res.json({ message: 'Category deleted' });
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Loan routes
+app.get('/api/loans', authMiddleware, async (req: AuthRequest, res) => {
+    try {
+        const loans = await loanService.getLoans(req.user!.id);
+        res.json(loans);
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/items/:itemId/loans', authMiddleware, async (req: AuthRequest, res) => {
+    try {
+        await loanService.createLoan(req.user!.id, req.params.itemId as string, req.body);
+        res.status(201).json({ message: 'Loan created' });
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.put('/api/loans/:id', authMiddleware, async (req: AuthRequest, res) => {
+    try {
+        await loanService.updateLoan(req.user!.id, req.params.id as string, req.body);
+        res.json({ message: 'Loan updated' });
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/loans/:id/return', authMiddleware, async (req: AuthRequest, res) => {
+    try {
+        await loanService.returnLoan(req.user!.id, req.params.id as string);
+        res.json({ message: 'Loan returned' });
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.delete('/api/loans/:id', authMiddleware, async (req: AuthRequest, res) => {
+    try {
+        await loanService.deleteLoan(req.user!.id, req.params.id as string);
+        res.json({ message: 'Loan deleted' });
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+const PORT = process.env.PORT || 3000;
+
+// Catch-all route to serve index.html for SPA (excluding /api)
+app.get(/^(?!\/api).*/, (req, res) => {
+    res.sendFile(path.join(__dirname, '../../index.html'));
+});
+
+const server = app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+});
+
+process.on('SIGTERM', () => {
+    server.close();
+});
