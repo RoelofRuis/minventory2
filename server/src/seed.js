@@ -5,6 +5,7 @@ import { ulid } from 'ulid';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { getDbConfig } from './db-config.js';
 import { categories as fixtureCategories, subCategories as fixtureSubCategories, items as fixtureItems, generatePlaceholderImage } from './fixtures.js';
 
 dotenv.config();
@@ -51,7 +52,7 @@ async function seed() {
 
     const db = knex({
         client: 'pg',
-        connection: process.env.DATABASE_URL || 'postgres://user:password@localhost:5432/minventorydb'
+        connection: getDbConfig()
     });
 
     try {

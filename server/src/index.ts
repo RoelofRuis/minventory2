@@ -15,6 +15,7 @@ import session from 'express-session';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import pgSession from 'connect-pg-simple';
+import { getDbConfig } from './db-config.js';
 
 const PostgresStore = pgSession(session);
 
@@ -57,7 +58,7 @@ app.use(helmet({
 }));
 
 const usePostgres = process.env.DB_TYPE === 'postgres';
-const dbUrl = process.env.DATABASE_URL || 'postgres://user:password@localhost:5432/minventorydb';
+const dbConfig = getDbConfig();
 
 const sessionSecret = process.env.SESSION_SECRET;
 if (!sessionSecret && process.env.NODE_ENV === 'production') {
@@ -65,7 +66,10 @@ if (!sessionSecret && process.env.NODE_ENV === 'production') {
 }
 
 app.use(session({
-    store: usePostgres ? new PostgresStore({ conString: dbUrl, createTableIfMissing: true }) : undefined,
+    store: usePostgres ? new PostgresStore({ 
+        ...(typeof dbConfig === 'string' ? { conString: dbConfig } : { conObject: dbConfig as any }),
+        createTableIfMissing: true 
+    }) : undefined,
     secret: sessionSecret || 'session-secret',
     resave: false,
     saveUninitialized: false,
@@ -120,7 +124,7 @@ async function initDB() {
     if (usePostgres) {
         const db = knex({
             client: 'pg',
-            connection: process.env.DATABASE_URL || 'postgres://user:password@localhost:5432/minventorydb'
+            connection: dbConfig
         });
 
         // Run migrations

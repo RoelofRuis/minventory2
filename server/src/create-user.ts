@@ -4,6 +4,7 @@ import { AuthService } from './services/auth.js';
 import dotenv from 'dotenv';
 import { generateSecret, generateURI } from 'otplib';
 import qrcode from 'qrcode';
+import { getDbConfig } from './db-config.js';
 
 dotenv.config();
 
@@ -18,7 +19,7 @@ async function main() {
 
     const db = knex({
         client: 'pg',
-        connection: process.env.DATABASE_URL || 'postgres://user:password@localhost:5432/minventorydb'
+        connection: getDbConfig()
     });
 
     const userRepository = new PostgresUserRepository(db);

@@ -2,6 +2,7 @@ import knex from 'knex';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { getDbConfig } from './db-config.js';
 
 dotenv.config();
 
@@ -11,7 +12,7 @@ const __dirname = path.dirname(__filename);
 async function runMigrations() {
     const db = knex({
         client: 'pg',
-        connection: process.env.DATABASE_URL || 'postgres://user:password@localhost:5432/minventorydb'
+        connection: getDbConfig()
     });
 
     try {

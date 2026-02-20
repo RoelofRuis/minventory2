@@ -95,6 +95,7 @@ Environment variables the container understands:
 - `SESSION_SECRET` (required in production): a long, random string used to sign sessions.
 - `DB_TYPE`: set to `postgres` to use PostgreSQL; omit it to use the in‑memory database (good for quick demos).
 - `DATABASE_URL`: PostgreSQL connection string, e.g. `postgres://user:password@db:5432/minventorydb` (only needed when `DB_TYPE=postgres`).
+- `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `POSTGRES_HOST`, `POSTGRES_PORT`: Individual PostgreSQL connection parameters (alternative to `DATABASE_URL`, useful for encoding only the password).
 - `BYPASS_2FA`: set to `true` to disable 2FA enforcement on login (useful for development or recovery).
 - `PORT`: app listen port inside the container (defaults to `8080` in the image).
 
@@ -137,11 +138,13 @@ Open http://localhost:8080 and sign in with the default credentials listed below
 docker compose up -d db
 ```
 
-2) Migrations: no manual step needed. The production container now runs Knex migrations automatically on startup when `DB_TYPE=postgres` is set. If you prefer to run them from your host instead (optional), you still can:
+2) Migrations: no manual step needed. The production container now runs Knex migrations automatically on startup when `DB_TYPE=postgres` is set. If you prefer to run them from your host instead (optional), you still can (either via `DATABASE_URL` or individual `POSTGRES_*` variables):
 
 ```bash
 export DB_TYPE=postgres
-export DATABASE_URL=postgres://user:password@localhost:5432/minventorydb
+export POSTGRES_USER=user
+export POSTGRES_PASSWORD=password
+export POSTGRES_DB=minventorydb
 npm run db:migrate
 ```
 
