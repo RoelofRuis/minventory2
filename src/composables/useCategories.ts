@@ -6,9 +6,7 @@ export function useCategories() {
 
   const fetchCategories = async () => {
     try {
-      const res = await axios.get('/api/categories', {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-      });
+      const res = await axios.get('/api/categories');
       categories.value = res.data;
     } catch (err) {
       console.error('Failed to fetch categories', err);

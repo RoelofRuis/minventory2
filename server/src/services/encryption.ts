@@ -40,12 +40,16 @@ export function decrypt(encryptedData: Buffer, key: Buffer): Buffer {
     }
 }
 
-export function deriveKey(password: string, salt: string): Buffer {
-    // Improved secure key derivation using scrypt with production-grade parameters
-    return crypto.scryptSync(password, salt, 32, {
-        N: 131072, // Cost factor: 2^17 (128MB RAM)
-        r: 8,      // Block size
-        p: 1,      // Parallelization factor
-        maxmem: 256 * 1024 * 1024 // 256MB limit
+export async function deriveKey(password: string, salt: string): Promise<Buffer> {
+    return new Promise((resolve, reject) => {
+        crypto.scrypt(password, salt, 32, {
+            N: 131072, // Cost factor: 2^17 (128MB RAM)
+            r: 8,      // Block size
+            p: 1,      // Parallelization factor
+            maxmem: 256 * 1024 * 1024 // 256MB limit
+        }, (err, dk) => {
+            if (err) return reject(err);
+            resolve(dk as Buffer);
+        });
     });
 }

@@ -48,9 +48,7 @@ const setupMode = ref(false);
 
 const setup2FA = async () => {
   try {
-    const res = await axios.post('/api/auth/setup-2fa', {}, {
-      headers: { 'Authorization': `Bearer ${authStore.token}` }
-    });
+    const res = await axios.post('/api/auth/setup-2fa', {});
     qrCode.value = res.data.qrCode;
     setupMode.value = true;
   } catch (err: any) {
@@ -62,10 +60,8 @@ const verifyToken = async () => {
   loading.value = true;
   error.value = '';
   try {
-    const res = await axios.post('/api/auth/verify-2fa', { token: token.value }, {
-      headers: { 'Authorization': `Bearer ${authStore.token}` }
-    });
-    authStore.setToken(res.data.token);
+    await axios.post('/api/auth/verify-2fa', { token: token.value });
+    await authStore.checkAuth();
     router.push('/');
   } catch (err: any) {
     error.value = 'Invalid code. Try again.';

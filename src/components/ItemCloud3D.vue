@@ -367,7 +367,6 @@ const fetchObjectUrl = async (url: string): Promise<string> => {
   if (imageUrlCache.has(url)) return imageUrlCache.get(url)!;
   try {
     const res = await axios.get(url, {
-      headers: { 'Authorization': `Bearer ${authStore.token}` },
       responseType: 'blob'
     });
     const objectUrl = URL.createObjectURL(res.data);
@@ -567,9 +566,7 @@ const onMouseUp = async (event: MouseEvent) => {
         const item = intersects[0].object.userData;
         // Fetch full item details to match Dashboard behavior
         try {
-            const res = await axios.get(`/api/items/${item.id}`, {
-                headers: { 'Authorization': `Bearer ${authStore.token}` }
-            });
+            const res = await axios.get(`/api/items/${item.id}`);
             selectedItem.value = res.data;
         } catch (err) {
             selectedItem.value = item;

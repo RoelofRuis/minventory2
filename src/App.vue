@@ -154,9 +154,7 @@ const confirmUnlock = async () => {
   saving.value = true;
   unlockError.value = '';
   try {
-    await axios.post('/api/auth/unlock-private', { password: unlockPassword.value }, {
-      headers: { 'Authorization': `Bearer ${authStore.token}` }
-    });
+    await axios.post('/api/auth/unlock-private', { password: unlockPassword.value });
     authStore.togglePrivate(true);
     if (pendingEnableEdit.value) {
       authStore.setEditMode(true);

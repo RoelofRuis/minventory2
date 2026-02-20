@@ -12,9 +12,19 @@ import { encryptionMiddleware, EncryptionRequest } from './middleware/encryption
 import { deriveKey } from './services/encryption.js';
 import multer from 'multer';
 import session from 'express-session';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
+import pgSession from 'connect-pg-simple';
+
+const PostgresStore = pgSession(session);
 
 declare module 'express-session' {
   interface SessionData {
+    user?: {
+        id: string;
+        username: string;
+        is2FAVerified: boolean;
+    };
     encryptionKey?: string;
     privateUnlocked?: boolean;
   }
@@ -32,19 +42,66 @@ const __dirname = path.dirname(__filename);
 const app = express();
 app.use(express.json());
 
-app.use(session({
-    secret: process.env.SESSION_SECRET || 'session-secret',
-    resave: false,
-    saveUninitialized: true,
-    cookie: { secure: false } // In a real app with HTTPS, set this to true
+app.set('trust proxy', 1);
+app.use(helmet({
+  contentSecurityPolicy: {
+    useDefaults: true,
+    directives: {
+      defaultSrc: ["'self'"],
+      imgSrc: ["'self'", 'blob:', 'data:'],
+      connectSrc: ["'self'"],
+      objectSrc: ["'none'"],
+      upgradeInsecureRequests: []
+    }
+  }
 }));
+
+const usePostgres = process.env.DB_TYPE === 'postgres';
+const dbUrl = process.env.DATABASE_URL || 'postgres://user:password@localhost:5432/minventorydb';
+
+const sessionSecret = process.env.SESSION_SECRET;
+if (!sessionSecret && process.env.NODE_ENV === 'production') {
+    throw new Error('SESSION_SECRET must be set in production');
+}
+
+app.use(session({
+    store: usePostgres ? new PostgresStore({ conString: dbUrl, createTableIfMissing: true }) : undefined,
+    secret: sessionSecret || 'session-secret',
+    resave: false,
+    saveUninitialized: false,
+    name: 'sid',
+    cookie: { 
+        secure: process.env.NODE_ENV === 'production', 
+        httpOnly: true,
+        sameSite: 'lax',
+        maxAge: 24 * 60 * 60 * 1000 // 24 hours
+    }
+}));
+
+// Rate limiting
+const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 10, // limit each IP to 10 requests per windowMs
+    message: 'Too many requests, please try again later'
+});
+
+app.use('/api/auth/login', authLimiter);
+app.use('/api/auth/register', authLimiter);
+app.use('/api/auth/verify-2fa', authLimiter);
+app.use('/api/auth/unlock-private', authLimiter);
 
 // Serve static files from the 'public' directory
 app.use(express.static(path.join(__dirname, '../../public')));
 
-const upload = multer({ storage: multer.memoryStorage() });
+const upload = multer({ 
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 5 * 1024 * 1024, files: 1 },
+    fileFilter: (req, file, cb) => {
+        const ok = ['image/jpeg', 'image/png', 'image/webp'].includes(file.mimetype);
+        cb(ok ? null : new Error('Invalid file type'), ok);
+    }
+});
 
-const usePostgres = process.env.DB_TYPE === 'postgres';
 let userRepository: any;
 let itemRepository: any;
 let categoryRepository: any;
@@ -102,7 +159,7 @@ async function initDB() {
         if (!existing) {
             console.log('Seeding in-memory database with more sample data...');
             const user = await authService.register(username, password);
-            const key = deriveKey(password, user.encryptionKeySalt);
+            const key = await deriveKey(password, user.encryptionKeySalt);
             
             // Create categories
             const allCategories: any[] = [];
@@ -174,16 +231,26 @@ app.post('/api/auth/login', async (req, res) => {
     try {
         const { username, password } = req.body;
         const { user, requires2FA } = await authService.login(username, password);
-        const token = authService.generateToken(user, !requires2FA);
         
         // Derive encryption key and store in session
-        const key = deriveKey(password, user.encryptionKeySalt);
-        req.session.encryptionKey = key.toString('hex');
-        req.session.privateUnlocked = false;
+        const key = await deriveKey(password, user.encryptionKeySalt);
         
-        res.json({ token, requires2FA });
+        req.session.regenerate((err) => {
+            if (err) return res.status(500).json({ error: 'Could not regenerate session' });
+            
+            req.session.user = { 
+                id: user.id, 
+                username: user.username, 
+                is2FAVerified: !requires2FA 
+            };
+            req.session.encryptionKey = key.toString('hex');
+            req.session.privateUnlocked = false;
+            
+            res.json({ requires2FA });
+        });
     } catch (err: any) {
-        res.status(401).json({ error: err.message });
+        // Generic error message to avoid user enumeration
+        res.status(401).json({ error: 'Invalid credentials' });
     }
 });
 
@@ -215,8 +282,10 @@ app.post('/api/auth/verify-2fa', authMiddleware, async (req: AuthRequest, res) =
         
         const isValid = await authService.verify2FA(user, token);
         if (isValid) {
-            const newToken = authService.generateToken(user, true);
-            res.json({ token: newToken });
+            if (req.session.user) {
+                req.session.user.is2FAVerified = true;
+            }
+            res.json({ message: '2FA verified' });
         } else {
             res.status(400).json({ error: 'Invalid token' });
         }
@@ -241,6 +310,10 @@ app.post('/api/auth/unlock-private', authMiddleware, async (req: AuthRequest, re
     } catch (err: any) {
         res.status(500).json({ error: err.message });
     }
+});
+
+app.get('/api/auth/me', authMiddleware, (req: AuthRequest, res) => {
+    res.json(req.user);
 });
 
 // Item routes
@@ -280,11 +353,9 @@ app.get('/api/items/:id/thumb', authMiddleware, encryptionMiddleware, async (req
         if (ereq.headers['if-none-match'] === etag) return res.sendStatus(304);
 
         res.setHeader('Content-Type', data.mime || 'image/webp');
+        res.setHeader('Cache-Control', 'private, max-age=3600');
         if (ereq.query.v) {
-            res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
             res.setHeader('ETag', etag);
-        } else {
-            res.setHeader('Cache-Control', 'public, max-age=300');
         }
         res.end(data.buffer);
     } catch (err: any) {
@@ -302,11 +373,9 @@ app.get('/api/items/:id/image', authMiddleware, encryptionMiddleware, async (req
         if (ereq.headers['if-none-match'] === etag) return res.sendStatus(304);
 
         res.setHeader('Content-Type', data.mime || 'image/webp');
+        res.setHeader('Cache-Control', 'private, max-age=3600');
         if (ereq.query.v) {
-            res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
             res.setHeader('ETag', etag);
-        } else {
-            res.setHeader('Cache-Control', 'public, max-age=300');
         }
         res.end(data.buffer);
     } catch (err: any) {

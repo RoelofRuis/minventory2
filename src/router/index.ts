@@ -17,13 +17,17 @@ const router = createRouter({
   routes
 });
 
-router.beforeEach((to, _from, next) => {
+router.beforeEach(async (to, _from, next) => {
   const authStore = useAuthStore();
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
-    next('/login');
-  } else {
-    next();
+    try {
+      await authStore.checkAuth();
+    } catch {}
+    if (!authStore.isAuthenticated) {
+      return next('/login');
+    }
   }
+  next();
 });
 
 export default router;

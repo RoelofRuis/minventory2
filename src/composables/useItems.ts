@@ -16,9 +16,7 @@ export function useItems(categories: any) {
   const fetchItems = async () => {
     loading.value = true;
     try {
-      const res = await axios.get('/api/items', {
-        headers: { Authorization: `Bearer ${authStore.token}` }
-      });
+      const res = await axios.get('/api/items');
       items.value = res.data;
 
       // Load thumbnails asynchronously
@@ -44,7 +42,6 @@ export function useItems(categories: any) {
   const fetchObjectUrl = async (url: string) => {
     try {
       const res = await axios.get(url, { 
-        headers: { Authorization: `Bearer ${authStore.token}` },
         responseType: 'blob' 
       });
       return URL.createObjectURL(res.data);

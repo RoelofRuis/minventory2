@@ -37,7 +37,7 @@ const handleSubmit = async () => {
   error.value = '';
   try {
     const res = await axios.post('/api/auth/login', { username: username.value, password: password.value });
-    authStore.setToken(res.data.token);
+    await authStore.checkAuth();
     
     if (res.data.requires2FA) {
       router.push('/verify-2fa');

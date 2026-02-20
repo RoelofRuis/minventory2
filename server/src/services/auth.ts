@@ -1,13 +1,10 @@
 import bcrypt from 'bcrypt';
-import jwt from 'jsonwebtoken';
 import { generateSecret, verifySync, generateURI } from 'otplib';
 import qrcode from 'qrcode';
 import { ulid } from 'ulid';
 import { IUserRepository } from '../repositories/interfaces.js';
 import { User } from '../models/types.js';
 import crypto from 'crypto';
-
-const JWT_SECRET = process.env.JWT_SECRET || 'supersecret';
 
 export class AuthService {
     constructor(private userRepository: IUserRepository) {}
@@ -63,13 +60,5 @@ export class AuthService {
             await this.userRepository.update(user);
         }
         return isValid;
-    }
-
-    generateToken(user: User, is2FAVerified: boolean): string {
-        return jwt.sign({ 
-            id: user.id, 
-            username: user.username,
-            is2FAVerified 
-        }, JWT_SECRET, { expiresIn: '1h' });
     }
 }

@@ -3,19 +3,25 @@ import axios from 'axios';
 
 export const useAuthStore = defineStore('auth', {
     state: () => ({
-        token: localStorage.getItem('token') || null,
         user: null as any,
         showPrivate: false,
         editMode: localStorage.getItem('editMode') === 'true',
         gridColumns: Math.min(Math.max(Number(localStorage.getItem('gridColumns')) || 3, 1), 5)
     }),
     getters: {
-        isAuthenticated: (state) => !!state.token
+        isAuthenticated: (state) => !!state.user
     },
     actions: {
-        setToken(token: string) {
-            this.token = token;
-            localStorage.setItem('token', token);
+        async checkAuth() {
+            try {
+                const res = await axios.get('/api/auth/me');
+                this.user = res.data;
+            } catch (err) {
+                this.user = null;
+            }
+        },
+        setUser(user: any) {
+            this.user = user;
         },
         async logout() {
             try {
@@ -23,11 +29,9 @@ export const useAuthStore = defineStore('auth', {
             } catch (err) {
                 console.error('Logout failed', err);
             }
-            this.token = null;
             this.user = null;
             this.showPrivate = false;
             this.editMode = false;
-            localStorage.removeItem('token');
             localStorage.setItem('editMode', 'false');
         },
         togglePrivate(val: boolean) {

@@ -89,12 +89,19 @@
         <button v-if="authStore.editMode" class="btn-primary" style="width: auto;" @click="openCategoryModal()">
           <Plus :size="20" style="vertical-align: middle;" /> Add Category
         </button>
+        <div class="search-wrapper" style="flex: 1;">
+          <input v-model="categorySearch" type="text" placeholder="Search categories..." />
+          <button v-if="categorySearch" class="clear-button" @click="categorySearch = ''" title="Clear search">
+            <X :size="16" />
+          </button>
+        </div>
       </div>
       
       <div v-if="categories.length === 0" class="silver-text">No categories created yet.</div>
+      <div v-else-if="filteredCategories.length === 0" class="silver-text">No categories found.</div>
       
-      <div class="grid">
-        <div v-for="cat in visibleCategories" :key="cat.id" class="item-card" @click="authStore.editMode && openCategoryModal(cat)" :style="{ borderColor: cat.color || 'var(--border-color)', cursor: authStore.editMode ? 'pointer' : 'default' }">
+      <div class="grid" v-else>
+        <div v-for="cat in filteredCategories" :key="cat.id" class="item-card" @click="authStore.editMode && openCategoryModal(cat)" :style="{ borderColor: cat.color || 'var(--border-color)', cursor: authStore.editMode ? 'pointer' : 'default' }">
           <h3 :style="{ color: cat.color || 'var(--accent-purple)', margin: '0 0 8px 0' }">
             <Lock v-if="cat.isPrivate" :size="14" :color="cat.private ? '#ef4444' : '#f59e0b'" style="margin-right: 6px; vertical-align: middle;" />
             {{ cat.name }}
@@ -438,6 +445,7 @@ const saving = ref(false);
 
 const currentTab = ref('items');
 const loans = ref<any[]>([]);
+const categorySearch = ref('');
 
 // Modals state
 const showItemModal = ref(false);
@@ -533,6 +541,16 @@ const visibleCategories = computed(() => {
   return authStore.showPrivate ? categories.value : categories.value.filter(c => !c.private);
 });
 
+const filteredCategories = computed(() => {
+  const q = categorySearch.value.trim().toLowerCase();
+  const base = visibleCategories.value as any[];
+  if (!q) return base;
+  return base.filter(c =>
+    c.name.toLowerCase().includes(q) ||
+    (c.description || '').toLowerCase().includes(q)
+  );
+});
+
 const sortedCategories = computed(() => {
   let cats = categories.value;
   if (!authStore.showPrivate) {
@@ -568,14 +586,10 @@ watch(() => authStore.showPrivate, () => {
 
 // Fetching
 const fetchData = async () => {
-  const headers: any = { 
-    'Authorization': `Bearer ${authStore.token}`
-  };
-  
   const [_, __, loansRes] = await Promise.all([
     fetchCategories(),
     fetchItems(),
-    axios.get('/api/loans', { headers })
+    axios.get('/api/loans')
   ]);
   
   loans.value = (loansRes as any).data;
@@ -725,15 +739,10 @@ const saveItem = async (stay = false) => {
     if (file.value) formData.append('image', file.value);
     else if (!preview.value && editingItem.value?.image) formData.append('removeImage', 'true');
 
-    const headers: any = { 
-      'Authorization': `Bearer ${authStore.token}`,
-      'Content-Type': 'multipart/form-data'
-    };
-
     if (editingItem.value) {
-      await axios.put(`/api/items/${editingItem.value.id}`, formData, { headers });
+      await axios.put(`/api/items/${editingItem.value.id}`, formData);
     } else {
-      await axios.post('/api/items', formData, { headers });
+      await axios.post('/api/items', formData);
     }
     
     if (stay) {
@@ -764,10 +773,7 @@ const saveItem = async (stay = false) => {
 
 const viewItemDetails = async (item: any) => {
   try {
-    const headers: any = { 
-      'Authorization': `Bearer ${authStore.token}`
-    };
-    const res = await axios.get(`/api/items/${item.id}`, { headers });
+    const res = await axios.get(`/api/items/${item.id}`);
     selectedItem.value = res.data;
     showDetailModal.value = true;
   } catch (err) {
@@ -779,9 +785,7 @@ const confirmDeleteItem = async (id: string) => {
   if (!authStore.editMode) return;
   if (confirm('Are you sure you want to delete this item?')) {
     try {
-      await axios.delete(`/api/items/${id}`, {
-        headers: { 'Authorization': `Bearer ${authStore.token}` }
-      });
+      await axios.delete(`/api/items/${id}`);
       await fetchData();
     } catch (err) {
       alert('Failed to delete item');
@@ -834,11 +838,10 @@ const saveCategory = async () => {
   if (!authStore.editMode) return;
   saving.value = true;
   try {
-    const headers = { 'Authorization': `Bearer ${authStore.token}` };
     if (editingCategory.value) {
-      await axios.put(`/api/categories/${editingCategory.value.id}`, categoryForm.value, { headers });
+      await axios.put(`/api/categories/${editingCategory.value.id}`, categoryForm.value);
     } else {
-      await axios.post('/api/categories', categoryForm.value, { headers });
+      await axios.post('/api/categories', categoryForm.value);
     }
     showCategoryModal.value = false;
     await fetchData();
@@ -853,9 +856,7 @@ const deleteCategory = async (id: string) => {
   if (!authStore.editMode) return;
   if (confirm('Are you sure? This will remove the category from all items.')) {
     try {
-      await axios.delete(`/api/categories/${id}`, {
-        headers: { 'Authorization': `Bearer ${authStore.token}` }
-      });
+      await axios.delete(`/api/categories/${id}`);
       await fetchData();
     } catch (err) {
       alert('Failed to delete category');
@@ -877,10 +878,7 @@ const openTransactionModal = async (item: any) => {
   
   // Fetch latest transactions
   try {
-    const headers: any = { 
-      'Authorization': `Bearer ${authStore.token}`
-    };
-    const res = await axios.get(`/api/items/${item.id}`, { headers });
+    const res = await axios.get(`/api/items/${item.id}`);
     selectedItem.value = res.data;
   } catch (err) {}
   
@@ -892,9 +890,7 @@ const saveTransaction = async () => {
   if (transactionForm.value.delta === 0) return;
   saving.value = true;
   try {
-    await axios.post(`/api/items/${selectedItem.value.id}/transactions`, transactionForm.value, {
-      headers: { 'Authorization': `Bearer ${authStore.token}` }
-    });
+    await axios.post(`/api/items/${selectedItem.value.id}/transactions`, transactionForm.value);
     showTransactionModal.value = false;
     await fetchData();
   } catch (err) {
@@ -916,9 +912,7 @@ const saveLoan = async () => {
   if (!authStore.editMode) return;
   saving.value = true;
   try {
-    await axios.post(`/api/items/${selectedItem.value.id}/loans`, loanForm.value, {
-      headers: { 'Authorization': `Bearer ${authStore.token}` }
-    });
+    await axios.post(`/api/items/${selectedItem.value.id}/loans`, loanForm.value);
     showLoanModal.value = false;
     await fetchData();
   } catch (err) {
@@ -931,9 +925,7 @@ const saveLoan = async () => {
 const returnLoan = async (id: string) => {
   if (!authStore.editMode) return;
   try {
-    await axios.post(`/api/loans/${id}/return`, {}, {
-      headers: { 'Authorization': `Bearer ${authStore.token}` }
-    });
+    await axios.post(`/api/loans/${id}/return`, {});
     await fetchData();
   } catch (err) {
     alert('Failed to return loan');
@@ -944,9 +936,7 @@ const deleteLoan = async (id: string) => {
   if (!authStore.editMode) return;
   if (confirm('Delete this loan record?')) {
     try {
-      await axios.delete(`/api/loans/${id}`, {
-        headers: { 'Authorization': `Bearer ${authStore.token}` }
-      });
+      await axios.delete(`/api/loans/${id}`);
       await fetchData();
     } catch (err) {
       alert('Failed to delete loan');
