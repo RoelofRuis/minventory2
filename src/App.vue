@@ -89,12 +89,11 @@
 <script setup lang="ts">
 import { computed, ref, nextTick, watch, onUnmounted } from 'vue';
 import { useAuthStore } from './stores/auth';
-import { useRouter, useRoute } from 'vue-router';
+import { useRoute } from 'vue-router';
 import { Rocket, Box, Eye, EyeOff, X, Settings } from 'lucide-vue-next';
 import axios from 'axios';
 
 const authStore = useAuthStore();
-const router = useRouter();
 const route = useRoute();
 
 const showSettingsModal = ref(false);
