@@ -19,7 +19,12 @@
         <button v-if="authStore.editMode" class="btn-primary" style="white-space: nowrap;" @click="openItemModal()">
           <Plus :size="20" style="vertical-align: middle;" /> Add Item
         </button>
-        <input v-model="searchQuery" type="text" placeholder="Search items..." />
+        <div class="search-wrapper">
+          <input v-model="searchQuery" type="text" placeholder="Search items..." />
+          <button v-if="searchQuery" class="clear-button" @click="searchQuery = ''" title="Clear search">
+            <X :size="16" />
+          </button>
+        </div>
         
         <CategoryFilter 
           v-model:selectedIds="selectedCategoryIds" 
@@ -786,6 +791,9 @@ const confirmDeleteItem = async (id: string) => {
 
 // Category Actions
 const toggleFilterCategory = (catId: string) => {
+  if (!Array.isArray(selectedCategoryIds.value)) {
+    selectedCategoryIds.value = [];
+  }
   const idx = selectedCategoryIds.value.indexOf(catId);
   if (idx > -1) {
     selectedCategoryIds.value.splice(idx, 1);

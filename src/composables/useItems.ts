@@ -1,13 +1,16 @@
 import { ref, computed, watch } from 'vue';
 import axios from 'axios';
 import { useAuthStore } from '../stores/auth';
+import { useFilterStore } from '../stores/filter';
+import { storeToRefs } from 'pinia';
 
 export function useItems(categories: any) {
   const authStore = useAuthStore();
   const items = ref<any[]>([]);
   const loading = ref(false);
-  const selectedCategoryIds = ref<string[]>([]);
-  const filterMode = ref<'and' | 'or'>('or');
+  const filterStore = useFilterStore();
+  const { selectedCategoryIds, mode } = storeToRefs(filterStore);
+  const filterMode = mode;
   const searchQuery = ref('');
 
   const fetchItems = async () => {
@@ -84,10 +87,11 @@ export function useItems(categories: any) {
       result = result.filter(i => !i.private);
     }
     
-    if (selectedCategoryIds.value.length > 0) {
+    const sel = Array.isArray(selectedCategoryIds.value) ? selectedCategoryIds.value : [];
+    if (sel.length > 0) {
       if (filterMode.value === 'or') {
         const allDescendantIds = new Set<string>();
-        selectedCategoryIds.value.forEach(id => {
+        sel.forEach(id => {
           getDescendantIds(id).forEach(dId => allDescendantIds.add(dId));
         });
         result = result.filter(item => 
@@ -96,7 +100,7 @@ export function useItems(categories: any) {
       } else {
         result = result.filter(item => {
           if (!item.categoryIds) return false;
-          return selectedCategoryIds.value.every(selectedId => {
+          return sel.every(selectedId => {
             const descendants = getDescendantIds(selectedId);
             return item.categoryIds.some((catId: string) => descendants.includes(catId));
           });

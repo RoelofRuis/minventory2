@@ -111,10 +111,12 @@ const updateSpriteOpacities = () => {
 
 
 watch(selectedCategoryIds, () => {
-  updateSpriteOpacities();
+  if (Array.isArray(selectedCategoryIds.value)) {
+    updateSpriteOpacities();
+  }
 }, { deep: true });
 
-watch(filterMode, () => {
+watch(() => filterMode as any, () => {
   updateSpriteOpacities();
 });
 
@@ -438,11 +440,15 @@ const createItemsCloud = () => {
       });
       const sprite = new THREE.Sprite(material);
       
-      // Random position within the cloud volume
+      // Random position within a spherical volume
+      const radius = halfRange * Math.pow(Math.random(), 1/3);
+      const theta = Math.random() * 2 * Math.PI;
+      const phi = Math.acos(2 * Math.random() - 1);
+      
       sprite.position.set(
-        (Math.random() - 0.5) * CLOUD_RANGE,
-        (Math.random() - 0.5) * CLOUD_RANGE,
-        (Math.random() - 0.5) * CLOUD_RANGE
+        radius * Math.sin(phi) * Math.cos(theta),
+        radius * Math.sin(phi) * Math.sin(theta),
+        radius * Math.cos(phi)
       );
       
       sprite.scale.set(60, 60, 1);
@@ -493,7 +499,7 @@ const rebuildCloud = () => {
   
   while (spriteGroup.children.length > 0) {
     const child = spriteGroup.children[0];
-    spriteGroup.remove(child);
+    if (child) spriteGroup.remove(child);
   }
   
   createItemsCloud();
@@ -511,24 +517,14 @@ const animate = () => {
       child.position.add(child.userData.velocity);
       
       // Wrap around the boundary for a continuous cloud feel
-      if (child.position.x > halfRange) child.position.x = -halfRange;
-      if (child.position.x < -halfRange) child.position.x = halfRange;
-      if (child.position.y > halfRange) child.position.y = -halfRange;
-      if (child.position.y < -halfRange) child.position.y = halfRange;
-      if (child.position.z > halfRange) child.position.z = -halfRange;
-      if (child.position.z < -halfRange) child.position.z = halfRange;
-
-      // Smooth fade out at boundaries
-      const xDist = Math.abs(child.position.x);
-      const yDist = Math.abs(child.position.y);
-      const zDist = Math.abs(child.position.z);
+      const dist = child.position.length();
+      if (dist > halfRange) {
+        child.position.setLength(halfRange - 1);
+        child.position.multiplyScalar(-1);
+      }
       
-      const boundaryOpacity = Math.min(
-        1.0,
-        (halfRange - xDist) / FADE_ZONE,
-        (halfRange - yDist) / FADE_ZONE,
-        (halfRange - zDist) / FADE_ZONE
-      );
+      // Smooth fade out at boundaries
+      const boundaryOpacity = Math.min(1.0, (halfRange - dist) / FADE_ZONE);
       
       if (child.material) {
         child.material.opacity = Math.max(0, boundaryOpacity) * (child.userData.baseOpacity || 1.0);
