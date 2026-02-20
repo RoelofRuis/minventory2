@@ -1,5 +1,5 @@
 <template>
-  <div class="container">
+  <div class="auth-container">
     <div class="card">
       <h2 class="app-title" style="margin-bottom: 20px; font-size: 1.5rem;">Login</h2>
       

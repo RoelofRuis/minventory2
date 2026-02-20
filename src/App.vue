@@ -1,5 +1,5 @@
 <template>
-  <header class="app-header">
+  <header class="app-header" v-if="!['/login', '/verify-2fa'].includes(route.path)">
     <div style="display: flex; align-items: center; justify-content: center; gap: 15px;">
       <h1 class="app-title">Minventory</h1>
       <router-link v-if="authStore.isAuthenticated" :to="viewToggleLink" class="icon-btn" :title="viewToggleTitle">
@@ -105,9 +105,8 @@ const unlockPasswordInput = ref<HTMLInputElement | null>(null);
 const saving = ref(false);
 const pendingEnableEdit = ref(false);
 
-const logout = () => {
-  authStore.logout();
-  router.push('/login');
+const logout = async () => {
+  await authStore.logout();
 };
 
 const togglePrivateItems = async () => {

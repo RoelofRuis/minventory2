@@ -134,6 +134,11 @@ input:focus, select:focus, textarea:focus {
   padding: 12px 20px 20px 20px;
 }
 
+.auth-container {
+  max-width: 400px;
+  margin: 60px auto;
+}
+
 .tabs {
   display: flex;
   margin-bottom: 20px;
@@ -394,6 +399,23 @@ body.modal-open {
   color: #dc2626;
   font-size: 0.875rem;
   margin-bottom: 12px;
+}
+
+.otp-input {
+  font-size: 2rem;
+  letter-spacing: 0.5rem;
+  text-align: center;
+  font-family: monospace;
+  padding: 12px;
+  background-color: var(--input-bg);
+  border: 2px solid var(--border-color);
+  border-radius: 12px;
+  margin-bottom: 24px;
+}
+
+.otp-input:focus {
+  border-color: var(--accent-purple);
+  outline: none;
 }
 
 .btn-danger {

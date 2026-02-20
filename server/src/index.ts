@@ -86,7 +86,6 @@ const authLimiter = rateLimit({
 });
 
 app.use('/api/auth/login', authLimiter);
-app.use('/api/auth/register', authLimiter);
 app.use('/api/auth/verify-2fa', authLimiter);
 app.use('/api/auth/unlock-private', authLimiter);
 
@@ -217,16 +216,6 @@ async function initDB() {
 await initDB();
 
 // Auth routes
-app.post('/api/auth/register', async (req, res) => {
-    try {
-        const { username, password } = req.body;
-        const user = await authService.register(username, password);
-        res.status(201).json({ message: 'User registered' });
-    } catch (err: any) {
-        res.status(400).json({ error: err.message });
-    }
-});
-
 app.post('/api/auth/login', async (req, res) => {
     try {
         const { username, password } = req.body;
@@ -235,18 +224,21 @@ app.post('/api/auth/login', async (req, res) => {
         // Derive encryption key and store in session
         const key = await deriveKey(password, user.encryptionKeySalt);
         
+        const is2FABypassed = process.env.BYPASS_2FA === 'true';
+        const needs2FA = requires2FA && !is2FABypassed;
+
         req.session.regenerate((err) => {
             if (err) return res.status(500).json({ error: 'Could not regenerate session' });
             
             req.session.user = { 
                 id: user.id, 
                 username: user.username, 
-                is2FAVerified: !requires2FA 
+                is2FAVerified: !needs2FA 
             };
             req.session.encryptionKey = key.toString('hex');
             req.session.privateUnlocked = false;
             
-            res.json({ requires2FA });
+            res.json({ requires2FA: needs2FA });
         });
     } catch (err: any) {
         // Generic error message to avoid user enumeration
@@ -254,6 +246,7 @@ app.post('/api/auth/login', async (req, res) => {
     }
 });
 
+// Logout route
 app.post('/api/auth/logout', (req, res) => {
     req.session.destroy((err) => {
         if (err) {
@@ -261,17 +254,6 @@ app.post('/api/auth/logout', (req, res) => {
         }
         res.json({ message: 'Logged out' });
     });
-});
-
-app.post('/api/auth/setup-2fa', authMiddleware, async (req: AuthRequest, res) => {
-    try {
-        const user = await userRepository.findById(req.user!.id);
-        if (!user) return res.status(404).json({ error: 'User not found' });
-        const data = await authService.generate2FA(user);
-        res.json(data);
-    } catch (err: any) {
-        res.status(500).json({ error: err.message });
-    }
 });
 
 app.post('/api/auth/verify-2fa', authMiddleware, async (req: AuthRequest, res) => {

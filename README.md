@@ -4,7 +4,8 @@ A web application to index and organize your belongings with security and privac
 
 ## Features
 
-- **Secure Authentication**: Password-based login with Google Authenticator (TOTP) 2FA support.
+- **Secure Authentication**: Password-based login with Google Authenticator (TOTP) 2FA enforced.
+- **Back-Channel User Management**: Create users and setup 2FA securely via console CLI, ensuring no public registration endpoints are exposed.
 - **Encryption at Rest**: All item names and images are encrypted in the database using AES-256-GCM. The encryption key is derived from your login password, ensuring only you can access your data.
 - **Blob Storage**: Images are stored as encrypted blobs directly in the database.
 - **Responsive Design**: Dark theme with silver and purple accents, optimized for tablet and mobile.
@@ -94,6 +95,7 @@ Environment variables the container understands:
 - `SESSION_SECRET` (required in production): a long, random string used to sign sessions.
 - `DB_TYPE`: set to `postgres` to use PostgreSQL; omit it to use the in‑memory database (good for quick demos).
 - `DATABASE_URL`: PostgreSQL connection string, e.g. `postgres://user:password@db:5432/minventorydb` (only needed when `DB_TYPE=postgres`).
+- `BYPASS_2FA`: set to `true` to disable 2FA enforcement on login (useful for development or recovery).
 - `PORT`: app listen port inside the container (defaults to `8080` in the image).
 
 Example run command (production‑like):
@@ -165,7 +167,17 @@ docker run --rm --name minventory \
 
 4) Open http://localhost:8080
 
-- If you ran the seed step, log in with the default user below. If not, register a new user via the UI.
+- If you ran the seed step, log in with the default user below. Otherwise, use the back-channel CLI to create a user (see below).
+
+## User Management (Back-Channel)
+
+To create a user and set up 2FA, use the following CLI command:
+
+```bash
+npm run create-user <username> <password>
+```
+
+This will output a 2FA secret and a QR code to scan with your Authenticator app. Registration via the web UI is disabled for security.
 
 ## Default Credentials
 

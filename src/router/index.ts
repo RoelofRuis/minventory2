@@ -19,6 +19,7 @@ const router = createRouter({
 
 router.beforeEach(async (to, _from, next) => {
   const authStore = useAuthStore();
+  
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
     try {
       await authStore.checkAuth();
@@ -27,6 +28,17 @@ router.beforeEach(async (to, _from, next) => {
       return next('/login');
     }
   }
+  
+  // If authenticated but 2FA is needed, redirect to /verify-2fa (unless already there)
+  if (authStore.isAuthenticated && authStore.user && !authStore.user.is2FAVerified && to.path !== '/verify-2fa') {
+    return next('/verify-2fa');
+  }
+
+  // If already authenticated (including 2FA), redirect away from login
+  if (to.path === '/login' && authStore.isAuthenticated && authStore.user && authStore.user.is2FAVerified) {
+    return next('/');
+  }
+
   next();
 });
 

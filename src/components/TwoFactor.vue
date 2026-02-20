@@ -1,32 +1,28 @@
 <template>
-  <div class="container">
-    <div class="card">
+  <div class="auth-container">
+    <div class="card" style="text-align: center;">
       <h2 class="app-title" style="margin-bottom: 20px; font-size: 1.5rem;">2FA Verification</h2>
       
-      <div v-if="!qrCode && !setupMode">
-        <p class="silver-text">Enter the code from your Authenticator app.</p>
-        <form @submit.prevent="verifyToken">
-          <input v-model="token" type="text" placeholder="6-digit code" required />
-          <p v-if="error" class="error-text">{{ error }}</p>
-          <button type="submit" class="btn-primary" :disabled="loading">Verify</button>
-        </form>
-        <div style="margin-top: 20px;">
-          <button @click="setup2FA" class="btn-secondary" style="width: 100%;">Setup 2FA</button>
-        </div>
-      </div>
-
-      <div v-if="qrCode">
-        <p class="silver-text">Scan this QR code with Google Authenticator:</p>
-        <div style="text-align: center; margin: 20px 0; background: #f1f5f9; padding: 12px; border-radius: 12px; display: inline-block;">
-          <img :src="qrCode" style="max-width: 200px; display: block;" />
-        </div>
-        <p class="silver-text">Then enter the code below:</p>
-        <form @submit.prevent="verifyToken">
-          <input v-model="token" type="text" placeholder="6-digit code" required />
-          <p v-if="error" class="error-text">{{ error }}</p>
-          <button type="submit" class="btn-primary" :disabled="loading">Complete Setup</button>
-        </form>
-      </div>
+      <p class="silver-text" style="margin-bottom: 30px;">Enter the 6-digit code from your Authenticator app.</p>
+      
+      <form @submit.prevent="verifyToken">
+        <input 
+          v-model="token" 
+          type="text" 
+          class="otp-input" 
+          placeholder="000000" 
+          maxlength="6" 
+          pattern="\d{6}"
+          required 
+          autofocus
+        />
+        
+        <p v-if="error" class="error-text">{{ error }}</p>
+        
+        <button type="submit" class="btn-primary" :disabled="loading || token.length !== 6">
+          {{ loading ? 'Verifying...' : 'Verify' }}
+        </button>
+      </form>
     </div>
   </div>
 </template>
@@ -41,22 +37,12 @@ const authStore = useAuthStore();
 const router = useRouter();
 
 const token = ref('');
-const qrCode = ref('');
 const loading = ref(false);
 const error = ref('');
-const setupMode = ref(false);
-
-const setup2FA = async () => {
-  try {
-    const res = await axios.post('/api/auth/setup-2fa', {});
-    qrCode.value = res.data.qrCode;
-    setupMode.value = true;
-  } catch (err: any) {
-    error.value = 'Failed to start 2FA setup';
-  }
-};
 
 const verifyToken = async () => {
+  if (token.value.length !== 6) return;
+  
   loading.value = true;
   error.value = '';
   try {

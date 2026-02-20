@@ -32,7 +32,9 @@ export const useAuthStore = defineStore('auth', {
             this.user = null;
             this.showPrivate = false;
             this.editMode = false;
-            localStorage.setItem('editMode', 'false');
+            this.gridColumns = 3;
+            localStorage.clear();
+            window.location.href = '/login';
         },
         togglePrivate(val: boolean) {
             this.showPrivate = val;

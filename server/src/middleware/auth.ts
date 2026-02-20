@@ -14,8 +14,9 @@ export const authMiddleware = (req: AuthRequest, res: Response, next: NextFuncti
     }
 
     req.user = req.session.user;
+    const allowedWithout2FA = ['/api/auth/verify-2fa', '/api/auth/me', '/api/auth/logout'];
 
-    if (!req.user.is2FAVerified && req.path !== '/api/auth/verify-2fa') {
+    if (!req.user.is2FAVerified && !allowedWithout2FA.includes(req.path)) {
         return res.status(403).json({ error: '2FA verification required' });
     }
 
