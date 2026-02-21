@@ -67,7 +67,11 @@ if (!sessionSecret && process.env.NODE_ENV === 'production') {
 
 app.use(session({
     store: usePostgres ? new PostgresStore({ 
-        ...(typeof dbConfig === 'string' ? { conString: dbConfig } : { conObject: dbConfig as any }),
+        ...(typeof dbConfig === 'string' 
+            ? { conString: dbConfig } 
+            : (dbConfig as any).connectionString 
+                ? { conString: (dbConfig as any).connectionString, ssl: (dbConfig as any).ssl }
+                : { conObject: dbConfig as any }),
         createTableIfMissing: true 
     }) : undefined,
     secret: sessionSecret || 'session-secret',
