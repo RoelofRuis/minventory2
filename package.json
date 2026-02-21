@@ -9,7 +9,9 @@
     "preview": "vite preview",
     "seed": "tsx server/src/seed.js",
     "db:migrate": "tsx server/src/migrate.ts",
+    "db:migrate:prod": "node server/dist/migrate.js",
     "create-user": "tsx server/src/create-user.ts",
+    "create-user:prod": "node server/dist/create-user.js",
     "server-dev": "tsx watch server/src/index.ts",
     "server": "node server/dist/index.js"
   },

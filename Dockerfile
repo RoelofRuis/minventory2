@@ -1,5 +1,5 @@
 # Build frontend
-FROM node:20-alpine AS build-frontend
+FROM node:20-slim AS build-frontend
 WORKDIR /app
 COPY package*.json ./
 RUN npm install
@@ -7,7 +7,7 @@ COPY . .
 RUN npm run build
 
 # Build backend
-FROM node:20-alpine AS build-backend
+FROM node:20-slim AS build-backend
 WORKDIR /app
 COPY package*.json ./
 RUN npm install
@@ -18,7 +18,8 @@ RUN npx tsc -p server/tsconfig.json
 RUN npx tsc -p server/tsconfig.migrations.json
 
 # Production stage
-FROM node:20-alpine
+FROM node:20-slim
+RUN apt-get update && apt-get install -y bash procps && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY package*.json ./
 RUN npm install --omit=dev
