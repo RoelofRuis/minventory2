@@ -203,53 +203,60 @@ const initThree = () => {
   window.addEventListener('resize', onWindowResize);
 };
 
-const drawCircularItem = (ctx: CanvasRenderingContext2D, img: HTMLImageElement | null, name: string, itemCategories: any[]) => {
+const drawCircularItem = (ctx: CanvasRenderingContext2D, img: HTMLImageElement | null, name: string, itemCategories: any[], isIsolated: boolean = false) => {
   ctx.clearRect(0, 0, 128, 128);
   
-  // Outer Glow / Soft edge
-  ctx.beginPath();
-  ctx.arc(64, 64, 60, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgba(167, 139, 250, 0.25)';
-  ctx.fill();
-
-  // Circle path for clipping and border
-  ctx.beginPath();
-  ctx.arc(64, 64, 52, 0, Math.PI * 2);
-  ctx.closePath();
-  
-  // Save for clipping
   ctx.save();
-  ctx.clip();
   
-  if (img) {
-    const size = Math.min(img.width, img.height);
-    ctx.drawImage(
-      img, 
-      (img.width - size) / 2, (img.height - size) / 2, size, size, 
-      0, 0, 128, 128
-    );
+  if (isIsolated && img) {
+    // For isolated items, draw scaled to fit
+    const scale = Math.min(128 / img.width, 128 / img.height);
+    const w = img.width * scale;
+    const h = img.height * scale;
+    ctx.drawImage(img, (128 - w) / 2, (128 - h) / 2, w, h);
+    
+    // Soft fade at very edges
+    ctx.globalCompositeOperation = 'destination-in';
+    const radialGrad = ctx.createRadialGradient(64, 64, 56, 64, 64, 64);
+    radialGrad.addColorStop(0, 'rgba(255, 255, 255, 1)');
+    radialGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+    ctx.fillStyle = radialGrad;
+    ctx.fillRect(0, 0, 128, 128);
   } else {
-    const grad = ctx.createLinearGradient(0, 0, 128, 128);
-    grad.addColorStop(0, '#334155');
-    grad.addColorStop(1, '#1e293b');
-    ctx.fillStyle = grad;
-    ctx.fill();
+    // Regular items: circular crop with fadeout
+    if (img) {
+      const size = Math.min(img.width, img.height);
+      ctx.drawImage(
+        img, 
+        (img.width - size) / 2, (img.height - size) / 2, size, size, 
+        0, 0, 128, 128
+      );
+    } else {
+      const grad = ctx.createLinearGradient(0, 0, 128, 128);
+      grad.addColorStop(0, '#334155');
+      grad.addColorStop(1, '#1e293b');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 128, 128);
+    }
+    
+    // Circular fadeout mask
+    ctx.globalCompositeOperation = 'destination-in';
+    const radialGrad = ctx.createRadialGradient(64, 64, 48, 64, 64, 64);
+    radialGrad.addColorStop(0, 'rgba(255, 255, 255, 1)');
+    radialGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+    ctx.fillStyle = radialGrad;
+    ctx.fillRect(0, 0, 128, 128);
   }
+  
   ctx.restore();
-
-  // Border
-  ctx.beginPath();
-  ctx.arc(64, 64, 52, 0, Math.PI * 2);
-  ctx.strokeStyle = '#a78bfa';
-  ctx.lineWidth = 4;
-  ctx.stroke();
 
   // Category Blips
   if (itemCategories.length > 0) {
+    const blipRadius = isIsolated ? 60 : 52;
     itemCategories.slice(0, 5).forEach((cat, i) => {
       ctx.beginPath();
       const angle = (i / Math.min(itemCategories.length, 5)) * Math.PI * 2 - Math.PI / 2;
-      const r = 52; 
+      const r = blipRadius; 
       const bx = 64 + Math.cos(angle) * r;
       const by = 64 + Math.sin(angle) * r;
       ctx.arc(bx, by, 6, 0, Math.PI * 2);
@@ -262,9 +269,9 @@ const drawCircularItem = (ctx: CanvasRenderingContext2D, img: HTMLImageElement |
   }
 
   // Title label (drawn after clipping so it never gets cropped)
-  ctx.font = 'bold 13px Inter, sans-serif';
+  ctx.font = '500 12px Inter, system-ui, sans-serif';
   ctx.textAlign = 'center';
-  ctx.textBaseline = 'top';
+  ctx.textBaseline = 'middle';
 
   const maxWidth = 112; // leave small side padding within the 128px canvas
   const words = name.split(/\s+/);
@@ -321,7 +328,7 @@ const drawCircularItem = (ctx: CanvasRenderingContext2D, img: HTMLImageElement |
   // Background pill for readability
   const paddingX = 8;
   const paddingY = 4;
-  const lineHeight = 16;
+  const lineHeight = 15;
   const totalTextHeight = lines.length * lineHeight;
   
   let maxW = 0;
@@ -345,7 +352,7 @@ const drawCircularItem = (ctx: CanvasRenderingContext2D, img: HTMLImageElement |
   ctx.closePath();
   ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
   ctx.fill();
-  ctx.strokeStyle = 'rgba(167, 139, 250, 0.85)';
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
   ctx.lineWidth = 1.5;
   ctx.stroke();
 
@@ -355,7 +362,7 @@ const drawCircularItem = (ctx: CanvasRenderingContext2D, img: HTMLImageElement |
   ctx.shadowBlur = 3;
   
   lines.forEach((line, i) => {
-    ctx.fillText(line, 64, finalRy + paddingY + i * lineHeight);
+    ctx.fillText(line, 64, finalRy + paddingY + (i + 0.5) * lineHeight);
   });
   
   ctx.shadowBlur = 0;
@@ -408,7 +415,7 @@ const createItemsCloud = () => {
           if (objUrl) {
             const img = new Image();
             img.onload = () => {
-              drawCircularItem(ctx, img, item.name, itemCats);
+              drawCircularItem(ctx, img, item.name, itemCats, item.isIsolated);
               if (texture) texture.needsUpdate = true;
             };
             img.src = objUrl;
@@ -419,13 +426,13 @@ const createItemsCloud = () => {
           const img = new Image();
           img.crossOrigin = "anonymous";
           img.onload = () => {
-            drawCircularItem(ctx, img, item.name, itemCats);
+            drawCircularItem(ctx, img, item.name, itemCats, item.isIsolated);
             if (texture) texture.needsUpdate = true;
           };
           img.src = item.image;
           return;
         }
-        drawCircularItem(ctx, null, item.name, itemCats);
+        drawCircularItem(ctx, null, item.name, itemCats, item.isIsolated);
         if (texture) texture.needsUpdate = true;
       };
       useThumb();

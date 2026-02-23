@@ -16,6 +16,7 @@
     "server": "node server/dist/index.js"
   },
   "dependencies": {
+    "@imgly/background-removal": "^1.7.0",
     "@types/express-session": "^1.18.2",
     "@types/three": "^0.183.0",
     "@types/tough-cookie": "^4.0.5",

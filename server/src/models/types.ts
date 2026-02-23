@@ -26,6 +26,7 @@ export interface Item {
     attachment: Attachment;
     intention: Intention;
     joy: Joy;
+    isIsolated?: boolean;
 }
 
 export interface Category {

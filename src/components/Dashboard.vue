@@ -169,7 +169,20 @@
                 {{ preview ? 'Change Photo' : 'Take Picture' }}
               </button>
               <img v-if="preview" :src="preview" style="max-width: 100%; border-radius: 8px; margin-top: 10px;" />
-              <button v-if="preview" type="button" class="btn-danger btn-small" style="margin-top: 5px;" @click="removeImage">Remove Image</button>
+              
+              <div v-if="preview" style="margin-top: 12px; display: flex; flex-direction: column; align-items: center; gap: 10px;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                  <label class="switch-container">
+                    <input type="checkbox" v-model="isolateObject" @change="handleIsolateChange" :disabled="processingBackground" />
+                    <div class="switch-track">
+                      <div class="switch-thumb"></div>
+                    </div>
+                    <span class="silver-text" style="font-size: 14px;">Isolate Object</span>
+                  </label>
+                  <Loader2 v-if="processingBackground" class="animate-spin accent-purple" :size="18" />
+                </div>
+                <button type="button" class="btn-danger btn-small" @click="removeImage">Remove Image</button>
+              </div>
             </div>
           </div>
 
@@ -431,8 +444,9 @@ import {
   Plus, Edit2, Trash2, Camera,
   ArrowRightLeft, Package, Tag, Users,
   CheckCircle, X, Lock,
-  Smile, Zap, Target, Heart
+  Smile, Zap, Target, Heart, Loader2
 } from 'lucide-vue-next';
+import { removeBackground } from '@imgly/background-removal';
 
 const authStore = useAuthStore();
 const { categories, fetchCategories, getCategoryName, getCategoryColor } = useCategories();
@@ -497,6 +511,11 @@ const itemNameInput = ref<HTMLInputElement | null>(null);
 const file = ref<File | null>(null);
 const preview = ref<string | null>(null);
 const stream = ref<MediaStream | null>(null);
+
+const isolateObject = ref(false);
+const processingBackground = ref(false);
+const originalFile = ref<File | null>(null);
+const originalPreview = ref<string | null>(null);
 
 // Enums
 const usageFrequencies = ['undefined', 'daily', 'weekly', 'monthly', 'yearly', 'seasonal', 'unused'];
@@ -602,9 +621,13 @@ const openItemModal = (item: any = null, keepImage = false) => {
   if (!keepImage) {
     preview.value = item?.image || null;
     file.value = null;
+    originalFile.value = null;
+    originalPreview.value = item?.image || null;
+    isolateObject.value = false;
   }
   
   if (item) {
+    isolateObject.value = item.isIsolated || false;
     itemForm.value = {
       name: item.name,
       quantity: item.quantity,
@@ -634,19 +657,64 @@ const openItemModal = (item: any = null, keepImage = false) => {
 
 const triggerFileInput = () => startCamera();
 
-const handleFileChange = (e: any) => {
+const handleFileChange = async (e: any) => {
   const selectedFile = e.target.files[0];
   if (selectedFile) {
-    file.value = selectedFile;
+    originalFile.value = selectedFile;
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      originalPreview.value = e.target?.result as string;
+      if (!isolateObject.value) {
+        preview.value = originalPreview.value;
+        file.value = selectedFile;
+      }
+    };
+    reader.readAsDataURL(selectedFile);
+
+    if (isolateObject.value) {
+      await applyBackgroundRemoval(selectedFile);
+    }
+  }
+};
+
+const handleIsolateChange = async () => {
+  if (isolateObject.value) {
+    if (originalFile.value) {
+      await applyBackgroundRemoval(originalFile.value);
+    }
+  } else {
+    // Revert to original
+    if (originalFile.value) {
+      file.value = originalFile.value;
+      preview.value = originalPreview.value;
+    }
+  }
+};
+
+const applyBackgroundRemoval = async (sourceFile: File) => {
+  processingBackground.value = true;
+  try {
+    const blob = await removeBackground(sourceFile);
+    const newFile = new File([blob], sourceFile.name.replace(/\.[^/.]+$/, "") + ".png", { type: 'image/png' });
+    file.value = newFile;
     const reader = new FileReader();
     reader.onload = (e) => preview.value = e.target?.result as string;
-    reader.readAsDataURL(selectedFile);
+    reader.readAsDataURL(blob);
+  } catch (err) {
+    console.error('Background removal failed', err);
+    isolateObject.value = false;
+    alert('Failed to isolate object. Please try again or use a clearer photo.');
+  } finally {
+    processingBackground.value = false;
   }
 };
 
 const removeImage = () => {
   file.value = null;
   preview.value = null;
+  originalFile.value = null;
+  originalPreview.value = null;
+  isolateObject.value = false;
 };
 
 const startCamera = async () => {
@@ -687,7 +755,7 @@ const closeCamera = () => {
   showCameraModal.value = false;
 };
 
-const capturePhoto = () => {
+const capturePhoto = async () => {
   if (videoRef.value && canvasRef.value) {
     const video = videoRef.value;
     const canvas = canvasRef.value;
@@ -701,8 +769,6 @@ const capturePhoto = () => {
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
       
-      preview.value = dataUrl;
-      
       // Convert to blob and file
       const parts = dataUrl.split(',');
       const byteString = atob(parts[1] || '');
@@ -713,7 +779,17 @@ const capturePhoto = () => {
         ia[i] = byteString.charCodeAt(i);
       }
       const blob = new Blob([ab], { type: mimeString });
-      file.value = new File([blob], 'captured_photo.jpg', { type: 'image/jpeg' });
+      const capturedFile = new File([blob], 'captured_photo.jpg', { type: 'image/jpeg' });
+
+      originalFile.value = capturedFile;
+      originalPreview.value = dataUrl;
+
+      if (isolateObject.value) {
+        await applyBackgroundRemoval(capturedFile);
+      } else {
+        preview.value = dataUrl;
+        file.value = capturedFile;
+      }
       
       closeCamera();
     }
@@ -731,6 +807,7 @@ const saveItem = async (stay = false) => {
   saving.value = true;
   try {
     const formData = new FormData();
+    formData.append('isIsolated', isolateObject.value.toString());
     Object.entries(itemForm.value).forEach(([key, val]) => {
       if (key === 'categoryIds') formData.append(key, JSON.stringify(val));
       else formData.append(key, val as any);
@@ -757,6 +834,9 @@ const saveItem = async (stay = false) => {
       };
       file.value = null;
       preview.value = null;
+      originalFile.value = null;
+      originalPreview.value = null;
+      isolateObject.value = false;
       nextTick(() => {
         itemNameInput.value?.focus();
       });

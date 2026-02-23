@@ -12,7 +12,6 @@
         <Settings :size="16" style="vertical-align: middle; margin-right: 4px;" />
         Settings
       </button>
-      <button @click="logout" class="btn-secondary btn-small" style="width: auto;">Logout</button>
     </div>
   </header>
   <router-view></router-view>
@@ -61,6 +60,13 @@
           />
         </div>
       </div>
+
+      <div style="margin-top: 24px; border-top: 1px solid var(--border-color); padding-top: 16px;">
+        <button @click="logout" class="btn-secondary btn-small" style="width: 100%;">
+          <LogOut :size="16" style="vertical-align: middle; margin-right: 4px;" />
+          Logout
+        </button>
+      </div>
     </div>
   </div>
 
@@ -90,7 +96,7 @@
 import { computed, ref, nextTick, watch, onUnmounted } from 'vue';
 import { useAuthStore } from './stores/auth';
 import { useRoute } from 'vue-router';
-import { Rocket, Box, Eye, EyeOff, X, Settings } from 'lucide-vue-next';
+import { Rocket, Box, Eye, EyeOff, X, Settings, LogOut } from 'lucide-vue-next';
 import axios from 'axios';
 
 const authStore = useAuthStore();

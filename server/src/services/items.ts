@@ -61,7 +61,8 @@ export class ItemService {
             usageFrequency: itemData.usageFrequency || UsageFrequency.Undefined,
             attachment: itemData.attachment || Attachment.Undefined,
             intention: itemData.intention || Intention.Undecided,
-            joy: itemData.joy || Joy.Medium
+            joy: itemData.joy || Joy.Medium,
+            isIsolated: itemData.isIsolated === 'true' || itemData.isIsolated === true
         };
 
         await this.itemRepository.create(item);
@@ -120,6 +121,9 @@ export class ItemService {
         if (itemData.attachment) existingItem.attachment = itemData.attachment;
         if (itemData.intention) existingItem.intention = itemData.intention;
         if (itemData.joy) existingItem.joy = itemData.joy;
+        if (itemData.isIsolated !== undefined) {
+            existingItem.isIsolated = itemData.isIsolated === 'true' || itemData.isIsolated === true;
+        }
 
         await this.itemRepository.update(existingItem);
 

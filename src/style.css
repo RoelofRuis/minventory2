@@ -370,6 +370,71 @@ body.modal-open {
   letter-spacing: -0.025em;
 }
 
+.accent-purple {
+  color: var(--accent-purple);
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Toggle Switch */
+.switch-container {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.switch-container input {
+  display: none;
+}
+
+.switch-track {
+  width: 40px;
+  height: 22px;
+  background-color: var(--input-bg);
+  border-radius: 11px;
+  position: relative;
+  transition: background-color 0.2s;
+  border: 1px solid var(--border-color);
+}
+
+.switch-container input:checked + .switch-track {
+  background-color: var(--accent-purple);
+}
+
+.switch-thumb {
+  width: 16px;
+  height: 16px;
+  background-color: white;
+  border-radius: 50%;
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+.switch-container input:checked + .switch-track .switch-thumb {
+  transform: translateX(18px);
+}
+
+.switch-container:hover .switch-track {
+  border-color: var(--accent-purple);
+}
+
+.switch-container input:disabled + .switch-track {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .silver-text {
   color: var(--accent-silver);
 }
