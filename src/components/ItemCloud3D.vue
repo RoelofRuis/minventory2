@@ -22,9 +22,9 @@
       
       <div v-if="selectedItem" class="item-info-overlay" @click.self="selectedItem = null">
         <div class="item-card sliding-card">
-          <div class="item-image-wrapper">
+          <div class="item-image-wrapper" style="height: 120px;">
             <div class="quantity-badge">{{ selectedItem.quantity }}</div>
-            <img v-if="selectedItem.image" :src="selectedItem.image" />
+            <img v-if="selectedItem.image" :src="selectedItem.image" style="height: 100%; width: 100%; object-fit: cover;" />
             <div v-else style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;">
               <Package :size="32" :stroke-width="1.5" class="silver-text" style="opacity: 0.8;" />
             </div>

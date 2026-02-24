@@ -53,6 +53,7 @@ export interface QuantityTransaction {
     itemId: string;
     delta: number;
     note?: string;
+    reason?: TransactionReason;
     createdAt: Date;
 }
 
@@ -100,4 +101,15 @@ export enum Joy {
     Low = 'low',
     Medium = 'medium',
     High = 'high'
+}
+
+export enum TransactionReason {
+    Lost = 'lost',
+    Stolen = 'stolen',
+    Broken = 'broken',
+    UsedUp = 'used up',
+    Replaced = 'replaced',
+    Donated = 'donated',
+    Sold = 'sold',
+    Disposed = 'disposed'
 }

@@ -308,6 +308,20 @@
             <label>Note (Optional)</label>
             <input v-model="transactionForm.note" type="text" />
           </div>
+          <div v-if="transactionForm.delta < 0" class="form-group">
+            <label>Reason</label>
+            <select v-model="transactionForm.reason">
+              <option :value="undefined">None</option>
+              <option value="lost">Lost</option>
+              <option value="stolen">Stolen</option>
+              <option value="broken">Broken</option>
+              <option value="used up">Used up</option>
+              <option value="replaced">Replaced</option>
+              <option value="donated">Donated</option>
+              <option value="sold">Sold</option>
+              <option value="disposed">Disposed</option>
+            </select>
+          </div>
           <div class="actions">
             <button type="submit" class="btn-primary" :disabled="saving">Update</button>
           </div>
@@ -317,6 +331,7 @@
           <h4 class="silver-text">Recent Transactions</h4>
           <div v-for="t in selectedItem.transactions" :key="t.id" style="font-size: 0.8rem; padding: 5px; border-bottom: 1px solid #444;">
             <span :class="t.delta > 0 ? 'accent-text' : 'error-text'">{{ t.delta > 0 ? '+' : '' }}{{ t.delta }}</span>
+            <span v-if="t.reason" class="silver-text" style="margin-left: 10px; font-style: italic;">({{ t.reason }})</span>
             <span style="margin-left: 10px;">{{ t.note || 'No note' }}</span>
             <span class="silver-text" style="float: right;">{{ new Date(t.createdAt).toLocaleDateString() }}</span>
           </div>
@@ -349,65 +364,224 @@
       </div>
     </div>
 
-    <!-- Item Detail Modal -->
     <div v-if="showDetailModal" class="modal-overlay" @click.self="showDetailModal = false">
       <div class="modal-content" style="max-width: 500px;">
         <X class="modal-close" :size="20" @click="showDetailModal = false" />
-        <h2 class="app-title" style="margin-bottom: 20px;">
-          <Lock v-if="selectedItem?.private" :size="20" style="margin-right: 8px; vertical-align: middle; color: #f59e0b;" />
-          {{ selectedItem?.name }}
-        </h2>
         
-        <img v-if="selectedItem?.image" :src="selectedItem.image" style="width: 100%; border-radius: 12px; margin-bottom: 20px;" />
-        <div v-else style="width: 100%; aspect-ratio: 1/1; display: flex; align-items: center; justify-content: center; background-color: var(--input-bg); border-radius: 12px; margin-bottom: 20px;">
-          <Package :size="64" :stroke-width="1.5" class="silver-text" style="opacity: 0.8;" />
-        </div>
-        
-        <div class="stats-grid">
-          <div class="stat-card">
-            <div class="stat-label">Quantity</div>
-            <div class="stat-value">{{ selectedItem?.quantity }}</div>
+        <!-- Back Button -->
+        <button v-if="modalView !== 'detail'" class="btn-secondary btn-small" style="margin-bottom: 15px;" @click="modalView = 'detail'">
+          <ArrowLeft :size="16" style="vertical-align: middle; margin-right: 4px;" /> Back
+        </button>
+
+        <div v-if="modalView === 'detail'">
+          <h2 class="app-title" style="margin-bottom: 20px;">
+            <Lock v-if="selectedItem?.private" :size="20" style="margin-right: 8px; vertical-align: middle; color: #f59e0b;" />
+            {{ selectedItem?.name }}
+          </h2>
+          
+          <img v-if="selectedItem?.image" :src="selectedItem.image" style="width: 200px; height: 200px; object-fit: cover; border-radius: 12px; margin: 0 auto 20px auto; display: block;" />
+          <div v-else style="width: 200px; height: 200px; display: flex; align-items: center; justify-content: center; background-color: var(--input-bg); border-radius: 12px; margin: 0 auto 20px auto;">
+            <Package :size="64" :stroke-width="1.5" class="silver-text" style="opacity: 0.8;" />
           </div>
-          <div v-if="isDefined(selectedItem?.usageFrequency)" class="stat-card">
-            <div class="stat-label">Usage</div>
-            <div class="stat-value">{{ formatStat(selectedItem?.usageFrequency) }}</div>
+
+          <div v-if="authStore.editMode" class="actions" style="margin-top: 10px; margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 20px;">
+            <button class="btn-secondary" title="Edit" @click="openItemModal(selectedItem)">
+              <Edit2 :size="18" style="vertical-align: middle; margin-right: 8px;" /> Edit
+            </button>
+            <button class="btn-secondary" title="Transactions" @click="openTransactionModal(selectedItem)">
+              <ArrowRightLeft :size="18" style="vertical-align: middle; margin-right: 8px;" /> Transactions
+            </button>
+            <button class="btn-secondary" title="Lend" @click="openLoanModal(selectedItem)">
+              <Users :size="18" style="vertical-align: middle; margin-right: 8px;" /> Lend
+            </button>
+            <button class="btn-danger" title="Delete" @click="confirmDeleteItem(selectedItem.id); showDetailModal = false" style="margin-left: auto;">
+              <Trash2 :size="18" />
+            </button>
           </div>
-          <div v-if="isDefined(selectedItem?.joy)" class="stat-card">
-            <div class="stat-label">Joy</div>
-            <div class="stat-value">{{ formatStat(selectedItem?.joy) }}</div>
+          
+          <div class="stats-grid">
+            <div class="stat-card">
+              <div class="stat-label">Quantity</div>
+              <div class="stat-value">{{ selectedItem?.quantity }}</div>
+            </div>
+            <div v-if="isDefined(selectedItem?.usageFrequency)" class="stat-card">
+              <div class="stat-label">Usage</div>
+              <div class="stat-value">{{ formatStat(selectedItem?.usageFrequency) }}</div>
+            </div>
+            <div v-if="isDefined(selectedItem?.joy)" class="stat-card">
+              <div class="stat-label">Joy</div>
+              <div class="stat-value">{{ formatStat(selectedItem?.joy) }}</div>
+            </div>
+            <div v-if="isDefined(selectedItem?.intention)" class="stat-card">
+              <div class="stat-label">Intention</div>
+              <div class="stat-value">{{ formatStat(selectedItem?.intention) }}</div>
+            </div>
+            <div v-if="isDefined(selectedItem?.attachment)" class="stat-card">
+              <div class="stat-label">Attachment</div>
+              <div class="stat-value">{{ formatStat(selectedItem?.attachment) }}</div>
+            </div>
           </div>
-          <div v-if="isDefined(selectedItem?.intention)" class="stat-card">
-            <div class="stat-label">Intention</div>
-            <div class="stat-value">{{ formatStat(selectedItem?.intention) }}</div>
-          </div>
-          <div v-if="isDefined(selectedItem?.attachment)" class="stat-card">
-            <div class="stat-label">Attachment</div>
-            <div class="stat-value">{{ formatStat(selectedItem?.attachment) }}</div>
+
+          <div v-if="selectedItem?.categoryIds && selectedItem.categoryIds.length > 0" style="margin-top: 20px;">
+            <span v-for="catId in selectedItem.categoryIds" :key="catId" class="category-tag" 
+              :style="{ backgroundColor: getCategoryColor(catId), color: 'white', cursor: 'pointer' }"
+              @click.stop="toggleFilterCategory(catId)">
+              {{ getCategoryName(catId) }}
+            </span>
           </div>
         </div>
 
-        <div v-if="selectedItem?.categoryIds && selectedItem.categoryIds.length > 0" style="margin-top: 20px;">
-           <span v-for="catId in selectedItem.categoryIds" :key="catId" class="category-tag" 
-             :style="{ backgroundColor: getCategoryColor(catId), color: 'white', cursor: 'pointer' }"
-             @click.stop="toggleFilterCategory(catId)">
-             {{ getCategoryName(catId) }}
-           </span>
+        <!-- Edit View -->
+        <div v-else-if="modalView === 'edit'">
+          <h2 class="accent-text">Edit Item</h2>
+          <form @submit.prevent="saveItem()">
+            <div class="form-group">
+              <label>Name</label>
+              <input v-model="itemForm.name" ref="itemNameInput" type="text" required />
+            </div>
+            
+            <div class="form-group">
+              <label>Image</label>
+              <div style="text-align: center;">
+                <input type="file" ref="fileInputRef" accept="image/*" capture="environment" @change="handleFileChange" style="display: none;" />
+                <button type="button" class="btn-secondary" style="width: 100%; margin-bottom: 10px;" @click="triggerFileInput">
+                  <Camera :size="20" style="vertical-align: middle; margin-right: 8px;" />
+                  {{ preview ? 'Change Photo' : 'Take Picture' }}
+                </button>
+                <img v-if="preview" :src="preview" style="max-width: 100%; border-radius: 8px; margin-top: 10px;" />
+                
+                <div v-if="preview" style="margin-top: 12px; display: flex; flex-direction: column; align-items: center; gap: 10px;">
+                  <div style="display: flex; align-items: center; gap: 12px;">
+                    <label class="switch-container">
+                      <input type="checkbox" v-model="isolateObject" @change="handleIsolateChange" :disabled="processingBackground" />
+                      <div class="switch-track">
+                        <div class="switch-thumb"></div>
+                      </div>
+                      <span class="silver-text" style="font-size: 14px;">Isolate Object</span>
+                    </label>
+                    <Loader2 v-if="processingBackground" class="animate-spin accent-purple" :size="18" />
+                  </div>
+                  <button type="button" class="btn-danger btn-small" @click="removeImage">Remove Image</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label>Categories</label>
+              <div style="display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 10px;">
+                <div v-for="cat in categories" :key="cat.id" 
+                    class="item-badge" 
+                    :style="{ cursor: 'pointer', backgroundColor: itemForm.categoryIds.includes(cat.id) ? (cat.color || 'var(--accent-purple)') : 'var(--input-bg)', color: itemForm.categoryIds.includes(cat.id) ? 'white' : 'var(--accent-silver)' }"
+                    @click="toggleCategory(cat.id)">
+                  {{ cat.name }}
+                </div>
+              </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+              <div class="form-group">
+                <label>Usage Frequency</label>
+                <select v-model="itemForm.usageFrequency">
+                  <option v-for="opt in usageFrequencies" :key="opt" :value="opt">{{ opt }}</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Attachment</label>
+                <select v-model="itemForm.attachment">
+                  <option v-for="opt in attachments" :key="opt" :value="opt">{{ opt }}</option>
+                </select>
+              </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+              <div class="form-group">
+                <label>Intention</label>
+                <select v-model="itemForm.intention">
+                  <option v-for="opt in intentions" :key="opt" :value="opt">{{ opt }}</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Joy</label>
+                <select v-model="itemForm.joy">
+                  <option v-for="opt in joys" :key="opt" :value="opt">{{ opt }}</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="actions">
+              <button type="submit" class="btn-primary" :disabled="saving">
+                <Loader2 v-if="saving" class="animate-spin" :size="18" style="vertical-align: middle; margin-right: 8px;" />
+                {{ editingItem ? 'Update' : 'Save' }}
+              </button>
+            </div>
+          </form>
         </div>
 
-        <div v-if="authStore.editMode" class="actions" style="margin-top: 30px; border-top: 1px solid var(--border-color); padding-top: 20px;">
-          <button class="btn-secondary" title="Edit" @click="openItemModal(selectedItem); showDetailModal = false">
-            <Edit2 :size="18" style="vertical-align: middle; margin-right: 8px;" /> Edit
-          </button>
-          <button class="btn-secondary" title="Transactions" @click="openTransactionModal(selectedItem); showDetailModal = false">
-            <ArrowRightLeft :size="18" style="vertical-align: middle; margin-right: 8px;" /> Transactions
-          </button>
-          <button class="btn-secondary" title="Lend" @click="openLoanModal(selectedItem); showDetailModal = false">
-            <Users :size="18" style="vertical-align: middle; margin-right: 8px;" /> Lend
-          </button>
-          <button class="btn-danger" title="Delete" @click="confirmDeleteItem(selectedItem.id); showDetailModal = false" style="margin-left: auto;">
-            <Trash2 :size="18" />
-          </button>
+        <!-- Transactions View -->
+        <div v-else-if="modalView === 'transactions'">
+          <h2 class="accent-text">Adjust Quantity: {{ selectedItem?.name }}</h2>
+          <p class="silver-text">Current Quantity: {{ selectedItem?.quantity }}</p>
+          <form @submit.prevent="saveTransaction">
+            <div class="form-group">
+              <label>Change (Positive or Negative)</label>
+              <input v-model="transactionForm.delta" type="number" step="any" required />
+            </div>
+            <div class="form-group">
+              <label>Note (Optional)</label>
+              <input v-model="transactionForm.note" type="text" />
+            </div>
+            <div v-if="transactionForm.delta < 0" class="form-group">
+              <label>Reason</label>
+              <select v-model="transactionForm.reason">
+                <option :value="undefined">None</option>
+                <option value="lost">Lost</option>
+                <option value="stolen">Stolen</option>
+                <option value="broken">Broken</option>
+                <option value="used up">Used up</option>
+                <option value="replaced">Replaced</option>
+                <option value="donated">Donated</option>
+                <option value="sold">Sold</option>
+                <option value="disposed">Disposed</option>
+              </select>
+            </div>
+            <div class="actions">
+              <button type="submit" class="btn-primary" :disabled="saving">Update</button>
+            </div>
+          </form>
+
+          <div v-if="selectedItem?.transactions" style="margin-top: 20px;">
+            <h4 class="silver-text">Recent Transactions</h4>
+            <div v-for="t in selectedItem.transactions" :key="t.id" style="font-size: 0.8rem; padding: 5px; border-bottom: 1px solid #444;">
+              <span :class="t.delta > 0 ? 'accent-text' : 'error-text'">{{ t.delta > 0 ? '+' : '' }}{{ t.delta }}</span>
+              <span v-if="t.reason" class="silver-text" style="margin-left: 10px; font-style: italic;">({{ t.reason }})</span>
+              <span style="margin-left: 10px;">{{ t.note || 'No note' }}</span>
+              <span class="silver-text" style="float: right;">{{ new Date(t.createdAt).toLocaleDateString() }}</span>
+            </div>
+          </div>
         </div>
+
+        <!-- Lend View -->
+        <div v-else-if="modalView === 'lend'">
+          <h2 class="accent-text">Lend Item: {{ selectedItem?.name }}</h2>
+          <form @submit.prevent="saveLoan">
+            <div class="form-group">
+              <label>Borrower Name</label>
+              <input v-model="loanForm.borrower" type="text" required />
+            </div>
+            <div class="form-group">
+              <label>Quantity</label>
+              <input v-model="loanForm.quantity" type="number" step="any" required />
+            </div>
+            <div class="form-group">
+              <label>Note</label>
+              <input v-model="loanForm.note" type="text" />
+            </div>
+            <div class="actions">
+              <button type="submit" class="btn-primary" :disabled="saving">Lend</button>
+            </div>
+          </form>
+        </div>
+
       </div>
     </div>
 
@@ -442,7 +616,7 @@ import { useItems } from '../composables/useItems';
 import { formatStat, isDefined } from '../utils/formatters';
 import {
   Plus, Edit2, Trash2, Camera,
-  ArrowRightLeft, Package, Tag, Users,
+  ArrowRightLeft, Package, Tag, Users, ArrowLeft,
   CheckCircle, X, Lock,
   Smile, Zap, Target, Heart, Loader2
 } from 'lucide-vue-next';
@@ -467,6 +641,7 @@ const showCategoryModal = ref(false);
 const showTransactionModal = ref(false);
 const showLoanModal = ref(false);
 const showDetailModal = ref(false);
+const modalView = ref('detail'); // 'detail', 'edit', 'transactions', 'lend'
 const showCameraModal = ref(false);
 
 const selectedItem = ref<any>(null);
@@ -495,7 +670,8 @@ const categoryForm = ref({
 
 const transactionForm = ref({
   delta: 0,
-  note: ''
+  note: '',
+  reason: undefined as string | undefined
 });
 
 const loanForm = ref({
@@ -648,7 +824,13 @@ const openItemModal = (item: any = null, keepImage = false) => {
       categoryIds: []
     };
   }
-  showItemModal.value = true;
+  
+  if (showDetailModal.value) {
+    modalView.value = 'edit';
+  } else {
+    showItemModal.value = true;
+  }
+  
   nextTick(() => {
     itemNameInput.value?.focus();
   });
@@ -842,6 +1024,14 @@ const saveItem = async (stay = false) => {
       });
     } else {
       showItemModal.value = false;
+      if (showDetailModal.value) {
+        modalView.value = 'detail';
+        // Refresh selectedItem after save
+        if (editingItem.value) {
+           const res = await axios.get(`/api/items/${editingItem.value.id}`);
+           selectedItem.value = res.data;
+        }
+      }
     }
     await fetchData();
   } catch (err) {
@@ -855,6 +1045,7 @@ const viewItemDetails = async (item: any) => {
   try {
     const res = await axios.get(`/api/items/${item.id}`);
     selectedItem.value = res.data;
+    modalView.value = 'detail';
     showDetailModal.value = true;
   } catch (err) {
     console.error(err);
@@ -954,7 +1145,7 @@ const onParentCategoryChange = () => {
 const openTransactionModal = async (item: any) => {
   if (!authStore.editMode) return;
   selectedItem.value = item;
-  transactionForm.value = { delta: 0, note: '' };
+  transactionForm.value = { delta: 0, note: '', reason: undefined };
   
   // Fetch latest transactions
   try {
@@ -962,7 +1153,11 @@ const openTransactionModal = async (item: any) => {
     selectedItem.value = res.data;
   } catch (err) {}
   
-  showTransactionModal.value = true;
+  if (showDetailModal.value) {
+    modalView.value = 'transactions';
+  } else {
+    showTransactionModal.value = true;
+  }
 };
 
 const saveTransaction = async () => {
@@ -972,6 +1167,11 @@ const saveTransaction = async () => {
   try {
     await axios.post(`/api/items/${selectedItem.value.id}/transactions`, transactionForm.value);
     showTransactionModal.value = false;
+    if (showDetailModal.value) {
+      modalView.value = 'detail';
+      const res = await axios.get(`/api/items/${selectedItem.value.id}`);
+      selectedItem.value = res.data;
+    }
     await fetchData();
   } catch (err) {
     alert('Failed to update quantity');
@@ -985,7 +1185,11 @@ const openLoanModal = (item: any) => {
   if (!authStore.editMode) return;
   selectedItem.value = item;
   loanForm.value = { borrower: '', quantity: 1, note: '' };
-  showLoanModal.value = true;
+  if (showDetailModal.value) {
+    modalView.value = 'lend';
+  } else {
+    showLoanModal.value = true;
+  }
 };
 
 const saveLoan = async () => {
@@ -994,6 +1198,11 @@ const saveLoan = async () => {
   try {
     await axios.post(`/api/items/${selectedItem.value.id}/loans`, loanForm.value);
     showLoanModal.value = false;
+    if (showDetailModal.value) {
+      modalView.value = 'detail';
+      const res = await axios.get(`/api/items/${selectedItem.value.id}`);
+      selectedItem.value = res.data;
+    }
     await fetchData();
   } catch (err) {
     alert('Failed to create loan');

@@ -410,8 +410,8 @@ app.delete('/api/items/:id', authMiddleware, async (req: AuthRequest, res) => {
 
 app.post('/api/items/:id/transactions', authMiddleware, async (req: AuthRequest, res) => {
     try {
-        const { delta, note } = req.body;
-        await itemService.addTransaction(req.user!.id, req.params.id as string, parseFloat(delta), note);
+        const { delta, note, reason } = req.body;
+        await itemService.addTransaction(req.user!.id, req.params.id as string, parseFloat(delta), note, reason);
         res.status(201).json({ message: 'Transaction added' });
     } catch (err: any) {
         res.status(500).json({ error: err.message });

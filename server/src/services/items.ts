@@ -299,7 +299,7 @@ export class ItemService {
         };
     }
 
-    async addTransaction(userId: string, itemId: string, delta: number, note?: string): Promise<void> {
+    async addTransaction(userId: string, itemId: string, delta: number, note?: string, reason?: TransactionReason): Promise<void> {
         const item = await this.itemRepository.findById(itemId, userId);
         if (!item) throw new Error('Item not found');
 
@@ -308,6 +308,7 @@ export class ItemService {
             itemId,
             delta,
             note,
+            reason,
             createdAt: new Date()
         };
 
