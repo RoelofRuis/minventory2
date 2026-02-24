@@ -1,5 +1,5 @@
 import { IItemRepository, IUserRepository, ICategoryRepository, IQuantityTransactionRepository, ILoanRepository } from '../repositories/interfaces.js';
-import { Item, UsageFrequency, Attachment, Intention, Joy, QuantityTransaction, Category } from '../models/types.js';
+import { Item, UsageFrequency, Attachment, Intention, Joy, QuantityTransaction, Category, TransactionReason } from '../models/types.js';
 import { encrypt, decrypt, deriveKey } from './encryption.js';
 import { ulid } from 'ulid';
 import sharp from 'sharp';
