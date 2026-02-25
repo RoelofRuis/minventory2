@@ -61,6 +61,29 @@
         </div>
       </div>
 
+      <div class="form-group" style="margin-top: 20px; border-top: 1px solid var(--border-color); padding-top: 12px;">
+        <div style="display:flex; align-items:center; justify-content: space-between; gap: 12px; margin-bottom: 8px;">
+          <label class="silver-text" style="font-weight: 600;">Debug Logs</label>
+          <div style="display: flex; gap: 8px;">
+            <button v-if="showLogs && logs.length > 0" class="btn-secondary btn-small" style="width: auto; white-space: nowrap; padding: 4px 8px;" @click="clearLogs">
+              <Trash2 :size="14" style="vertical-align: middle;" />
+            </button>
+            <button class="btn-secondary btn-small" style="width: auto; white-space: nowrap;" @click="showLogs = !showLogs">
+              <Terminal :size="16" style="vertical-align: middle; margin-right: 4px;" />
+              {{ showLogs ? 'Hide Logs' : 'Show Logs' }}
+            </button>
+          </div>
+        </div>
+        <div v-if="showLogs" class="log-container" style="max-height: 200px; overflow-y: auto; background: rgba(0,0,0,0.3); padding: 8px; border-radius: 4px; font-family: monospace; font-size: 10px;">
+          <div v-if="logs.length === 0" class="silver-text">No logs captured yet.</div>
+          <div v-for="(log, index) in logs" :key="index" :style="{ color: getLogColor(log.type), marginBottom: '4px', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '2px' }">
+            <span style="opacity: 0.5;">[{{ log.timestamp.toLocaleTimeString() }}]</span>
+            <span style="font-weight: bold; margin: 0 4px;">{{ log.type.toUpperCase() }}:</span>
+            <pre style="display: inline; white-space: pre-wrap; word-break: break-all; margin: 0; font-family: inherit;">{{ log.message }}</pre>
+          </div>
+        </div>
+      </div>
+
       <div style="margin-top: 24px; border-top: 1px solid var(--border-color); padding-top: 16px;">
         <button @click="logout" class="btn-secondary btn-small" style="width: 100%;">
           <LogOut :size="16" style="vertical-align: middle; margin-right: 4px;" />
@@ -96,8 +119,9 @@
 import { computed, ref, nextTick, watch, onUnmounted } from 'vue';
 import { useAuthStore } from './stores/auth';
 import { useRoute } from 'vue-router';
-import { Rocket, Box, Eye, EyeOff, X, Settings, LogOut } from 'lucide-vue-next';
+import { Rocket, Box, Eye, EyeOff, X, Settings, LogOut, Terminal, Trash2 } from 'lucide-vue-next';
 import axios from 'axios';
+import { logs, clearLogs } from './utils/logger';
 
 const authStore = useAuthStore();
 const route = useRoute();
@@ -109,6 +133,17 @@ const unlockError = ref('');
 const unlockPasswordInput = ref<HTMLInputElement | null>(null);
 const saving = ref(false);
 const pendingEnableEdit = ref(false);
+const showLogs = ref(false);
+
+const getLogColor = (type: string) => {
+  switch (type) {
+    case 'error': return '#ff4444';
+    case 'warn': return '#ffbb33';
+    case 'info': return '#33b5e5';
+    case 'debug': return '#2ecc71';
+    default: return '#ffffff';
+  }
+};
 
 const logout = async () => {
   await authStore.logout();
