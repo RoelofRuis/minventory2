@@ -49,8 +49,8 @@ app.use(helmet({
     useDefaults: true,
     directives: {
       defaultSrc: ["'self'"],
-      imgSrc: ["'self'", 'blob:', 'data:'],
-      connectSrc: ["'self'"],
+      imgSrc: ["'self'", 'blob:', 'data:', 'https://staticimgly.com'],
+      connectSrc: ["'self'", 'https://staticimgly.com'],
       scriptSrc: ["'self'", "'wasm-unsafe-eval'"],
       workerSrc: ["'self'", 'blob:'],
       objectSrc: ["'none'"],
