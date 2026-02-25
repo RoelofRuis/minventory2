@@ -51,10 +51,14 @@ app.use(helmet({
       defaultSrc: ["'self'"],
       imgSrc: ["'self'", 'blob:', 'data:'],
       connectSrc: ["'self'"],
+      scriptSrc: ["'self'", "'wasm-unsafe-eval'"],
+      workerSrc: ["'self'", 'blob:'],
       objectSrc: ["'none'"],
       upgradeInsecureRequests: []
     }
-  }
+  },
+  crossOriginOpenerPolicy: { policy: "same-origin" },
+  crossOriginEmbedderPolicy: { policy: "require-corp" }
 }));
 
 const usePostgres = process.env.DB_TYPE === 'postgres';
