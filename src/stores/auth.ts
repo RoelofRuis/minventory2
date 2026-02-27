@@ -46,21 +46,22 @@ export const useAuthStore = defineStore('auth', {
             localStorage.clear();
             window.location.href = '/login';
         },
-        togglePrivate(val: boolean) {
+        async togglePrivate(val: boolean) {
             this.showPrivate = val;
             localStorage.setItem('showPrivate', String(val));
+            if (!val) {
+                try {
+                    await axios.post('/api/auth/lock-private');
+                } catch (err) {
+                    console.error('Failed to lock private items on backend', err);
+                }
+            }
         },
-        setEditMode(val: boolean) {
+        async setEditMode(val: boolean) {
             this.editMode = val;
             localStorage.setItem('editMode', String(val));
             // Enabling edit mode enables private view by default; disabling turns it off
-            if (val) {
-                this.showPrivate = true;
-                localStorage.setItem('showPrivate', 'true');
-            } else {
-                this.showPrivate = false;
-                localStorage.setItem('showPrivate', 'false');
-            }
+            await this.togglePrivate(val);
         },
         setGridColumns(cols: number) {
             const cappedCols = Math.min(Math.max(cols, 1), 5);

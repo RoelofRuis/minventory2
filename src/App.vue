@@ -9,16 +9,16 @@
       </router-link>
     </div>
     <div v-if="authStore.isAuthenticated" style="margin-top: 8px; display: flex; align-items: center; justify-content: center; gap: 10px;">
-      <div v-if="authStore.showPrivate" title="Private mode active" style="display: flex; align-items: center;">
-        <Eye :size="18" style="color: #ffd700; opacity: 0.9;" />
-      </div>
-      <div v-if="authStore.editMode" title="Edit mode enabled" style="display: flex; align-items: center;">
-        <Pencil :size="18" style="color: #ffd700; opacity: 0.9;" />
-      </div>
       <button class="btn-secondary btn-small" style="width: auto; white-space: nowrap;" @click="showSettingsModal = true">
         <Settings :size="16" style="vertical-align: middle; margin-right: 4px;" />
         Settings
       </button>
+      <div v-if="authStore.showPrivate" title="Private mode active (Status Indicator)" style="display: flex; align-items: center;">
+        <Eye :size="18" style="color: var(--accent-purple); opacity: 0.9;" />
+      </div>
+      <div v-if="authStore.editMode" title="Edit mode enabled (Status Indicator)" style="display: flex; align-items: center;">
+        <Pencil :size="18" style="color: var(--accent-purple); opacity: 0.9;" />
+      </div>
     </div>
   </header>
   <router-view></router-view>
@@ -29,23 +29,27 @@
       <X class="modal-close" :size="20" @click="showSettingsModal = false" />
       <h2 class="accent-text">Settings</h2>
       <div class="form-group" style="display:flex; align-items:center; justify-content: space-between; gap: 12px; margin-top: 12px;">
-        <div>
-          <label class="silver-text" style="font-weight: 600;">Private Items</label>
-          <div class="silver-text" style="font-size: 12px;">{{ authStore.showPrivate ? 'Currently visible' : 'Currently hidden' }}</div>
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <div>
+            <label class="silver-text" style="font-weight: 600;">Private Items</label>
+            <div class="silver-text" style="font-size: 12px;">{{ authStore.showPrivate ? 'Currently visible' : 'Currently hidden' }}</div>
+          </div>
+          <component :is="authStore.showPrivate ? Eye : EyeOff" :size="20" style="color: var(--accent-purple); flex-shrink: 0;" title="Status Indicator" />
         </div>
         <button class="btn-secondary btn-small" style="width: auto; white-space: nowrap;" @click="openPrivateFromSettings">
-          <component :is="authStore.showPrivate ? EyeOff : Eye" :size="16" style="vertical-align: middle; margin-right: 4px;" />
           {{ authStore.showPrivate ? 'Hide Private' : 'Show Private' }}
         </button>
       </div>
 
       <div class="form-group" style="display:flex; align-items:center; justify-content: space-between; gap: 12px; margin-top: 12px;">
-        <div>
-          <label class="silver-text" style="font-weight: 600;">Edit Mode</label>
-          <div class="silver-text" style="font-size: 12px;">{{ authStore.editMode ? 'Enabled (private visible)' : 'Disabled' }}</div>
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <div>
+            <label class="silver-text" style="font-weight: 600;">Edit Mode</label>
+            <div class="silver-text" style="font-size: 12px;">{{ authStore.editMode ? 'Enabled (private visible)' : 'Disabled' }}</div>
+          </div>
+          <Settings v-if="authStore.editMode" :size="20" style="color: var(--accent-purple); flex-shrink: 0;" title="Status Indicator" />
         </div>
         <button class="btn-secondary btn-small" style="width: auto; white-space: nowrap;" @click="toggleEditModeFromSettings">
-          <Settings :size="16" style="vertical-align: middle; margin-right: 4px;" />
           {{ authStore.editMode ? 'Disable Edit' : 'Enable Edit' }}
         </button>
       </div>
@@ -165,7 +169,7 @@ const togglePrivateItems = async () => {
       unlockPasswordInput.value?.focus();
     });
   } else {
-    authStore.togglePrivate(false);
+    await authStore.togglePrivate(false);
   }
 };
 
@@ -174,7 +178,7 @@ const openPrivateFromSettings = async () => {
     showSettingsModal.value = false;
     await nextTick();
   }
-  togglePrivateItems();
+  await togglePrivateItems();
 };
 
 const toggleEditModeFromSettings = async () => {
@@ -184,13 +188,13 @@ const toggleEditModeFromSettings = async () => {
       pendingEnableEdit.value = true;
       showSettingsModal.value = false;
       await nextTick();
-      togglePrivateItems();
+      await togglePrivateItems();
     } else {
-      authStore.setEditMode(true);
+      await authStore.setEditMode(true);
     }
   } else {
     // Disabling edit also disables private
-    authStore.setEditMode(false);
+    await authStore.setEditMode(false);
   }
 };
 
@@ -201,9 +205,9 @@ const confirmUnlock = async () => {
   unlockError.value = '';
   try {
     await axios.post('/api/auth/unlock-private', { password: unlockPassword.value });
-    authStore.togglePrivate(true);
+    await authStore.togglePrivate(true);
     if (pendingEnableEdit.value) {
-      authStore.setEditMode(true);
+      await authStore.setEditMode(true);
       pendingEnableEdit.value = false;
     }
     showUnlockModal.value = false;

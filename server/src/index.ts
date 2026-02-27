@@ -310,6 +310,11 @@ app.post('/api/auth/unlock-private', authMiddleware, async (req: AuthRequest, re
     }
 });
 
+app.post('/api/auth/lock-private', authMiddleware, (req: AuthRequest, res) => {
+    req.session.privateUnlocked = false;
+    res.json({ message: 'Private items locked' });
+});
+
 app.get('/api/auth/me', authMiddleware, (req: AuthRequest, res) => {
     res.json({
         ...req.user,
