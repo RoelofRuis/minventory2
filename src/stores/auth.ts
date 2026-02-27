@@ -4,7 +4,7 @@ import axios from 'axios';
 export const useAuthStore = defineStore('auth', {
     state: () => ({
         user: null as any,
-        showPrivate: false,
+        showPrivate: localStorage.getItem('showPrivate') === 'true',
         editMode: localStorage.getItem('editMode') === 'true',
         gridColumns: Math.min(Math.max(Number(localStorage.getItem('gridColumns')) || 3, 1), 5)
     }),
@@ -16,8 +16,18 @@ export const useAuthStore = defineStore('auth', {
             try {
                 const res = await axios.get('/api/auth/me');
                 this.user = res.data;
-            } catch (err) {
+                // Sync private mode from backend session
+                this.showPrivate = !!res.data.privateUnlocked;
+                localStorage.setItem('showPrivate', String(this.showPrivate));
+            } catch (err: any) {
                 this.user = null;
+                // If not authenticated, clear session-based settings
+                if (err.response?.status === 401) {
+                    this.showPrivate = false;
+                    this.editMode = false;
+                    this.gridColumns = 3;
+                    localStorage.clear();
+                }
             }
         },
         setUser(user: any) {
@@ -38,6 +48,7 @@ export const useAuthStore = defineStore('auth', {
         },
         togglePrivate(val: boolean) {
             this.showPrivate = val;
+            localStorage.setItem('showPrivate', String(val));
         },
         setEditMode(val: boolean) {
             this.editMode = val;
@@ -45,8 +56,10 @@ export const useAuthStore = defineStore('auth', {
             // Enabling edit mode enables private view by default; disabling turns it off
             if (val) {
                 this.showPrivate = true;
+                localStorage.setItem('showPrivate', 'true');
             } else {
                 this.showPrivate = false;
+                localStorage.setItem('showPrivate', 'false');
             }
         },
         setGridColumns(cols: number) {

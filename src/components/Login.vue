@@ -37,6 +37,13 @@ const handleSubmit = async () => {
   error.value = '';
   try {
     const res = await axios.post('/api/auth/login', { username: username.value, password: password.value });
+    
+    // Reset settings for the new user session
+    localStorage.clear();
+    authStore.editMode = false;
+    authStore.showPrivate = false;
+    authStore.gridColumns = 3;
+
     await authStore.checkAuth();
     
     if (res.data.requires2FA) {

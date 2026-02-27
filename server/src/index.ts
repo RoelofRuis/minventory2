@@ -51,7 +51,7 @@ app.use(helmet({
         defaultSrc: ["'self'"],
         imgSrc: ["'self'", 'blob:', 'data:'],
         connectSrc: ["'self'", 'blob:', 'data:'],
-        scriptSrc: ["'self'", "'wasm-unsafe-eval'", "blob:"],
+        scriptSrc: ["'self'", "'unsafe-eval'", "'wasm-unsafe-eval'", "blob:"],
         workerSrc: ["'self'", 'blob:'],
         objectSrc: ["'none'"],
         upgradeInsecureRequests: []
@@ -311,7 +311,10 @@ app.post('/api/auth/unlock-private', authMiddleware, async (req: AuthRequest, re
 });
 
 app.get('/api/auth/me', authMiddleware, (req: AuthRequest, res) => {
-    res.json(req.user);
+    res.json({
+        ...req.user,
+        privateUnlocked: req.session.privateUnlocked || false
+    });
 });
 
 // Item routes

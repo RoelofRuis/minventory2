@@ -2,12 +2,19 @@
   <header class="app-header" v-if="!['/login', '/verify-2fa'].includes(route.path)">
     <div style="display: flex; align-items: center; justify-content: center; gap: 15px;">
       <h1 class="app-title">Minventory</h1>
+
       <router-link v-if="authStore.isAuthenticated" :to="viewToggleLink" class="icon-btn" :title="viewToggleTitle">
         <Rocket v-if="route.path !== '/cloud'" :size="28" />
         <Box v-else :size="28" />
       </router-link>
     </div>
     <div v-if="authStore.isAuthenticated" style="margin-top: 8px; display: flex; align-items: center; justify-content: center; gap: 10px;">
+      <div v-if="authStore.showPrivate" title="Private mode active" style="display: flex; align-items: center;">
+        <Eye :size="18" style="color: #ffd700; opacity: 0.9;" />
+      </div>
+      <div v-if="authStore.editMode" title="Edit mode enabled" style="display: flex; align-items: center;">
+        <Pencil :size="18" style="color: #ffd700; opacity: 0.9;" />
+      </div>
       <button class="btn-secondary btn-small" style="width: auto; white-space: nowrap;" @click="showSettingsModal = true">
         <Settings :size="16" style="vertical-align: middle; margin-right: 4px;" />
         Settings
@@ -119,7 +126,7 @@
 import { computed, ref, nextTick, watch, onUnmounted } from 'vue';
 import { useAuthStore } from './stores/auth';
 import { useRoute } from 'vue-router';
-import { Rocket, Box, Eye, EyeOff, X, Settings, LogOut, Terminal, Trash2 } from 'lucide-vue-next';
+import { Rocket, Box, Eye, EyeOff, X, Settings, LogOut, Terminal, Trash2, Pencil } from 'lucide-vue-next';
 import axios from 'axios';
 import { logs, clearLogs } from './utils/logger';
 
