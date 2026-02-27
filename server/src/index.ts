@@ -48,13 +48,10 @@ app.use(helmet({
   contentSecurityPolicy: {
     useDefaults: true,
     directives: {
-      defaultSrc: ["'self'"],
-      imgSrc: ["'self'", 'blob:', 'data:', 'https://staticimgly.com'],
-      connectSrc: ["'self'", 'blob:', 'data:', 'https://staticimgly.com'],
-      scriptSrc: ["'self'", "'wasm-unsafe-eval'", "blob:", "https://staticimgly.com"],
-      workerSrc: ["'self'", 'blob:'],
-      objectSrc: ["'none'"],
-      upgradeInsecureRequests: []
+        defaultSrc: ["'self'"],
+        imgSrc: ["'self'", 'blob:', 'data:'],
+        connectSrc: ["'self'"],
+        objectSrc: ["'none'"],
     }
   },
   crossOriginOpenerPolicy: { policy: "same-origin" },
