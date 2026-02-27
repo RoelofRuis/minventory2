@@ -6,8 +6,36 @@
           v-model:selectedIds="selectedCategoryIds" 
           v-model:mode="filterMode" 
           :categories="visibleCategories" 
-          style="flex: 1;"
+          style="flex: 2;"
         />
+
+        <div class="stat-filters">
+          <StatFilter 
+            v-model:selectedValues="selectedJoys" 
+            :options="joys" 
+            :icon="Smile" 
+            label="Joy" 
+          />
+          <StatFilter 
+            v-model:selectedValues="selectedFrequencies" 
+            :options="usageFrequencies" 
+            :icon="Zap" 
+            label="Usage" 
+          />
+          <StatFilter 
+            v-model:selectedValues="selectedIntentions" 
+            :options="intentions" 
+            :icon="Target" 
+            label="Intention" 
+          />
+          <StatFilter 
+            v-model:selectedValues="selectedAttachments" 
+            :options="attachments" 
+            :icon="Heart" 
+            label="Attachment" 
+          />
+        </div>
+
         <div class="selection-count">
           <span class="count-value">{{ totalIndividualItems }}</span>
           <span class="count-label">{{ totalIndividualItems === 1 ? 'item' : 'items' }}</span>
@@ -36,16 +64,16 @@
 
           <div class="item-stats-row" v-if="isDefined(selectedItem.joy) || isDefined(selectedItem.usageFrequency) || isDefined(selectedItem.intention) || isDefined(selectedItem.attachment)">
             <div v-if="isDefined(selectedItem.joy)" class="item-stat" title="Joy">
-              <Smile :size="14" /> <span>{{ formatStat(selectedItem.joy) }}</span>
+              <Smile :size="14" :style="{ color: getStatColor(selectedItem.joy || 'medium') }" /> <span class="stat-text">{{ formatStat(selectedItem.joy) }}</span>
             </div>
             <div v-if="isDefined(selectedItem.usageFrequency)" class="item-stat" title="Usage">
-              <Zap :size="14" /> <span>{{ formatStat(selectedItem.usageFrequency) }}</span>
+              <Zap :size="14" :style="{ color: getStatColor(selectedItem.usageFrequency || 'undefined') }" /> <span class="stat-text">{{ formatStat(selectedItem.usageFrequency) }}</span>
             </div>
             <div v-if="isDefined(selectedItem.intention)" class="item-stat" title="Intention">
-              <Target :size="14" /> <span>{{ formatStat(selectedItem.intention) }}</span>
+              <Target :size="14" :style="{ color: getStatColor(selectedItem.intention || 'undecided') }" /> <span class="stat-text">{{ formatStat(selectedItem.intention) }}</span>
             </div>
             <div v-if="isDefined(selectedItem.attachment)" class="item-stat" title="Attachment">
-              <Heart :size="14" /> <span>{{ formatStat(selectedItem.attachment) }}</span>
+              <Heart :size="14" :style="{ color: getStatColor(selectedItem.attachment || 'undefined') }" /> <span class="stat-text">{{ formatStat(selectedItem.attachment) }}</span>
             </div>
           </div>
           
@@ -73,15 +101,18 @@ import axios from 'axios';
 import { useAuthStore } from '../stores/auth';
 import { Package, Lock, Smile, Zap, Target, Heart } from 'lucide-vue-next';
 import CategoryFilter from './CategoryFilter.vue';
+import StatFilter from './StatFilter.vue';
 import { useCategories } from '../composables/useCategories';
 import { useItems } from '../composables/useItems';
-import { formatStat, isDefined } from '../utils/formatters';
+import { formatStat, isDefined, getStatColor } from '../utils/formatters';
+import { usageFrequencies, attachments, intentions, joys } from '../utils/constants';
 
 const authStore = useAuthStore();
 const { categories, fetchCategories, getCategoryName, getCategoryColor } = useCategories();
 const visibleCategories = computed(() => authStore.showPrivate ? categories.value : categories.value.filter(c => !c.private));
 const { 
   items, loading, selectedCategoryIds, filterMode,
+  selectedJoys, selectedFrequencies, selectedIntentions, selectedAttachments,
   fetchItems, filteredItems, totalIndividualItems
 } = useItems(categories);
 
@@ -110,15 +141,9 @@ const updateSpriteOpacities = () => {
 };
 
 
-watch(selectedCategoryIds, () => {
-  if (Array.isArray(selectedCategoryIds.value)) {
-    updateSpriteOpacities();
-  }
-}, { deep: true });
-
-watch(() => filterMode as any, () => {
+watch(filteredItems, () => {
   updateSpriteOpacities();
-});
+}, { deep: true });
 
 watch(() => authStore.showPrivate, async (val) => {
   if (val) {
@@ -389,7 +414,7 @@ const createItemsCloud = () => {
   const halfRange = CLOUD_RANGE / 2;
   textureCache.clear();
   
-  const srcItems = filteredItems.value;
+  const srcItems = items.value;
 
   srcItems.forEach((item) => {
     const qty = Math.max(1, item.quantity || 1);

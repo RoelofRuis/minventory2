@@ -58,7 +58,8 @@ app.use(helmet({
     }
   },
   crossOriginOpenerPolicy: { policy: "same-origin" },
-  crossOriginEmbedderPolicy: false
+  crossOriginEmbedderPolicy: { policy: "require-corp" },
+  crossOriginResourcePolicy: { policy: "same-origin" }
 }));
 
 const usePostgres = process.env.DB_TYPE === 'postgres';
@@ -270,6 +271,14 @@ app.post('/api/auth/logout', (req, res) => {
         }
         res.json({ message: 'Logged out' });
     });
+});
+
+app.get('/logout', (req, res) => {
+    res.redirect('/login');
+});
+
+app.post('/logout', (req, res) => {
+    res.redirect('/login');
 });
 
 app.post('/api/auth/verify-2fa', authMiddleware, async (req: AuthRequest, res) => {

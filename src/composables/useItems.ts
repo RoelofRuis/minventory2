@@ -9,7 +9,14 @@ export function useItems(categories: any) {
   const items = ref<any[]>([]);
   const loading = ref(false);
   const filterStore = useFilterStore();
-  const { selectedCategoryIds, mode } = storeToRefs(filterStore);
+  const { 
+    selectedCategoryIds, 
+    mode, 
+    selectedJoys, 
+    selectedFrequencies, 
+    selectedIntentions, 
+    selectedAttachments 
+  } = storeToRefs(filterStore);
   const filterMode = mode;
   const searchQuery = ref('');
 
@@ -109,6 +116,22 @@ export function useItems(categories: any) {
       const q = searchQuery.value.toLowerCase();
       result = result.filter(i => i.name.toLowerCase().includes(q));
     }
+
+    if (selectedJoys.value.length > 0) {
+      result = result.filter(i => selectedJoys.value.includes(i.joy || 'medium'));
+    }
+
+    if (selectedFrequencies.value.length > 0) {
+      result = result.filter(i => selectedFrequencies.value.includes(i.usageFrequency || 'undefined'));
+    }
+
+    if (selectedIntentions.value.length > 0) {
+      result = result.filter(i => selectedIntentions.value.includes(i.intention || 'undecided'));
+    }
+
+    if (selectedAttachments.value.length > 0) {
+      result = result.filter(i => selectedAttachments.value.includes(i.attachment || 'undefined'));
+    }
     
     return result;
   });
@@ -123,6 +146,10 @@ export function useItems(categories: any) {
     selectedCategoryIds,
     filterMode,
     searchQuery,
+    selectedJoys,
+    selectedFrequencies,
+    selectedIntentions,
+    selectedAttachments,
     fetchItems,
     filteredItems,
     totalIndividualItems,

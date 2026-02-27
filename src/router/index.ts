@@ -8,6 +8,7 @@ import { useAuthStore } from '../stores/auth';
 const routes = [
   { path: '/', component: Dashboard, meta: { requiresAuth: true } },
   { path: '/login', component: Login },
+  { path: '/logout', redirect: '/login' },
   { path: '/verify-2fa', component: TwoFactor, meta: { requiresAuth: true } },
   { path: '/cloud', component: ItemCloud3D, meta: { requiresAuth: true } }
 ];

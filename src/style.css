@@ -270,9 +270,10 @@ input:focus, select:focus, textarea:focus {
 }
 
 .item-stats-row {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 4px 10px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
   margin-bottom: 12px;
   background: rgba(255, 255, 255, 0.03);
   padding: 6px 10px;
@@ -296,8 +297,14 @@ input:focus, select:focus, textarea:focus {
   white-space: nowrap;
 }
 
+@media (max-width: 1000px) {
+  .stat-text {
+    display: none;
+  }
+}
+
 .item-stat svg {
-  color: var(--accent-purple);
+  flex-shrink: 0;
 }
 
 
@@ -585,6 +592,12 @@ body.modal-open {
 .clear-button:hover {
   color: var(--text-primary);
   background-color: rgba(255, 255, 255, 0.1);
+}
+
+.stat-filters {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .selection-count {

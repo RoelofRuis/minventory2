@@ -105,11 +105,13 @@
   </div>
 
   <!-- Unlock Private Modal -->
-  <div v-if="showUnlockModal" class="modal-overlay" @click.self="showUnlockModal = false">
+  <div v-if="showUnlockModal" class="modal-overlay" @click.self="closeUnlockModal">
     <div class="modal-content" style="max-width: 400px;">
-      <X class="modal-close" :size="20" @click="showUnlockModal = false" />
-      <h2 class="accent-text">Unlock Private Items</h2>
-      <p class="silver-text" style="margin-bottom: 20px;">Please enter your password to reveal hidden items.</p>
+      <X class="modal-close" :size="20" @click="closeUnlockModal" />
+      <h2 class="accent-text">{{ pendingEnableEdit ? 'Unlock for Editing' : 'Unlock Private Items' }}</h2>
+      <p class="silver-text" style="margin-bottom: 20px;">
+        {{ pendingEnableEdit ? 'Please enter your password to enable editing. This also reveals hidden items.' : 'Please enter your password to reveal hidden items.' }}
+      </p>
       <form @submit.prevent="confirmUnlock">
         <div class="form-group">
           <label>Password</label>
@@ -160,6 +162,11 @@ const logout = async () => {
   await authStore.logout();
 };
 
+const closeUnlockModal = () => {
+  showUnlockModal.value = false;
+  pendingEnableEdit.value = false;
+};
+
 const togglePrivateItems = async () => {
   if (!authStore.showPrivate) {
     unlockPassword.value = '';
@@ -208,9 +215,8 @@ const confirmUnlock = async () => {
     await authStore.togglePrivate(true);
     if (pendingEnableEdit.value) {
       await authStore.setEditMode(true);
-      pendingEnableEdit.value = false;
     }
-    showUnlockModal.value = false;
+    closeUnlockModal();
   } catch (err) {
     unlockError.value = 'Invalid password or failed to unlock';
   } finally {

@@ -30,8 +30,35 @@
           v-model:selectedIds="selectedCategoryIds" 
           v-model:mode="filterMode" 
           :categories="visibleCategories" 
-          style="flex: 1;"
+          style="flex: 2;"
         />
+
+        <div class="stat-filters">
+          <StatFilter 
+            v-model:selectedValues="selectedJoys" 
+            :options="joys" 
+            :icon="Smile" 
+            label="Joy" 
+          />
+          <StatFilter 
+            v-model:selectedValues="selectedFrequencies" 
+            :options="usageFrequencies" 
+            :icon="Zap" 
+            label="Usage" 
+          />
+          <StatFilter 
+            v-model:selectedValues="selectedIntentions" 
+            :options="intentions" 
+            :icon="Target" 
+            label="Intention" 
+          />
+          <StatFilter 
+            v-model:selectedValues="selectedAttachments" 
+            :options="attachments" 
+            :icon="Heart" 
+            label="Attachment" 
+          />
+        </div>
         <div class="selection-count">
           <span class="count-value">{{ totalIndividualItems }}</span>
           <span class="count-label">{{ totalIndividualItems === 1 ? 'item' : 'items' }}</span>
@@ -58,16 +85,16 @@
 
             <div class="item-stats-row" v-if="isDefined(item.joy) || isDefined(item.usageFrequency) || isDefined(item.intention) || isDefined(item.attachment)">
               <div v-if="isDefined(item.joy)" class="item-stat" title="Joy">
-                <Smile :size="14" /> <span>{{ formatStat(item.joy) }}</span>
+                <Smile :size="14" :style="{ color: getStatColor(item.joy || 'medium') }" /> <span class="stat-text">{{ formatStat(item.joy) }}</span>
               </div>
               <div v-if="isDefined(item.usageFrequency)" class="item-stat" title="Usage">
-                <Zap :size="14" /> <span>{{ formatStat(item.usageFrequency) }}</span>
+                <Zap :size="14" :style="{ color: getStatColor(item.usageFrequency || 'undefined') }" /> <span class="stat-text">{{ formatStat(item.usageFrequency) }}</span>
               </div>
               <div v-if="isDefined(item.intention)" class="item-stat" title="Intention">
-                <Target :size="14" /> <span>{{ formatStat(item.intention) }}</span>
+                <Target :size="14" :style="{ color: getStatColor(item.intention || 'undecided') }" /> <span class="stat-text">{{ formatStat(item.intention) }}</span>
               </div>
               <div v-if="isDefined(item.attachment)" class="item-stat" title="Attachment">
-                <Heart :size="14" /> <span>{{ formatStat(item.attachment) }}</span>
+                <Heart :size="14" :style="{ color: getStatColor(item.attachment || 'undefined') }" /> <span class="stat-text">{{ formatStat(item.attachment) }}</span>
               </div>
             </div>
             
@@ -146,6 +173,18 @@
       <div class="modal-content">
         <X class="modal-close" :size="20" @click="showItemModal = false" />
         <h2 class="accent-text">{{ editingItem ? 'Edit Item' : 'Add New Item' }}</h2>
+        
+        <div v-if="editingItem" class="actions" style="margin-top: 10px; margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 20px;">
+          <button type="button" class="btn-secondary" title="Transactions" @click="openTransactionModal(editingItem)">
+            <ArrowRightLeft :size="18" style="vertical-align: middle; margin-right: 8px;" /> Transactions
+          </button>
+          <button type="button" class="btn-secondary" title="Lend" @click="openLoanModal(editingItem)">
+            <Users :size="18" style="vertical-align: middle; margin-right: 8px;" /> Lend
+          </button>
+          <button type="button" class="btn-danger" title="Delete" @click="confirmDeleteItem(editingItem.id); showItemModal = false" style="margin-left: auto;">
+            <Trash2 :size="18" />
+          </button>
+        </div>
         <form @submit.prevent="saveItem()">
           <div class="form-group">
             <label>Name</label>
@@ -433,7 +472,20 @@
 
         <!-- Edit View -->
         <div v-else-if="modalView === 'edit'">
-          <h2 class="accent-text">Edit Item</h2>
+          <h2 class="accent-text">{{ editingItem ? 'Edit Item' : 'Add New Item' }}</h2>
+
+          <div v-if="editingItem" class="actions" style="margin-top: 10px; margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 20px;">
+            <button type="button" class="btn-secondary" title="Transactions" @click="openTransactionModal(editingItem)">
+              <ArrowRightLeft :size="18" style="vertical-align: middle; margin-right: 8px;" /> Transactions
+            </button>
+            <button type="button" class="btn-secondary" title="Lend" @click="openLoanModal(editingItem)">
+              <Users :size="18" style="vertical-align: middle; margin-right: 8px;" /> Lend
+            </button>
+            <button type="button" class="btn-danger" title="Delete" @click="confirmDeleteItem(editingItem.id); showDetailModal = false" style="margin-left: auto;">
+              <Trash2 :size="18" />
+            </button>
+          </div>
+
           <form @submit.prevent="saveItem()">
             <div class="form-group">
               <label>Name</label>
@@ -611,9 +663,11 @@ import { ref, onMounted, onUnmounted, computed, nextTick, watch } from 'vue';
 import axios from 'axios';
 import { useAuthStore } from '../stores/auth';
 import CategoryFilter from './CategoryFilter.vue';
+import StatFilter from './StatFilter.vue';
 import { useCategories } from '../composables/useCategories';
 import { useItems } from '../composables/useItems';
-import { formatStat, isDefined } from '../utils/formatters';
+import { formatStat, isDefined, getStatColor } from '../utils/formatters';
+import { usageFrequencies, attachments, intentions, joys } from '../utils/constants';
 import {
   Plus, Edit2, Trash2, Camera,
   ArrowRightLeft, Package, Tag, Users, ArrowLeft,
@@ -626,6 +680,7 @@ const authStore = useAuthStore();
 const { categories, fetchCategories, getCategoryName, getCategoryColor } = useCategories();
 const { 
   items, loading, selectedCategoryIds, filterMode, searchQuery, 
+  selectedJoys, selectedFrequencies, selectedIntentions, selectedAttachments,
   fetchItems, filteredItems, totalIndividualItems
 } = useItems(categories);
 
@@ -692,12 +747,6 @@ const isolateObject = ref(false);
 const processingBackground = ref(false);
 const originalFile = ref<File | null>(null);
 const originalPreview = ref<string | null>(null);
-
-// Enums
-const usageFrequencies = ['undefined', 'daily', 'weekly', 'monthly', 'yearly', 'seasonal', 'unused'];
-const attachments = ['undefined', 'replacable', 'some', 'strong', 'sentimental'];
-const intentions = ['undecided', 'keep', 'sell', 'donate', 'maintain', 'upgrade', 'dispose'];
-const joys = ['low', 'medium', 'high'];
 
 watch([showItemModal, showCategoryModal, showTransactionModal, showLoanModal, showDetailModal, showCameraModal], (vals) => {
   if (vals.some(v => v)) {
@@ -1047,8 +1096,12 @@ const viewItemDetails = async (item: any) => {
   try {
     const res = await axios.get(`/api/items/${item.id}`);
     selectedItem.value = res.data;
-    modalView.value = 'detail';
-    showDetailModal.value = true;
+    if (authStore.editMode) {
+      openItemModal(res.data);
+    } else {
+      modalView.value = 'detail';
+      showDetailModal.value = true;
+    }
   } catch (err) {
     console.error(err);
   }
