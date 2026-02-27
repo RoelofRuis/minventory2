@@ -876,7 +876,9 @@ const handleIsolateChange = async () => {
 const applyBackgroundRemoval = async (sourceFile: File) => {
   processingBackground.value = true;
   try {
-    const blob = await removeBackground(sourceFile);
+    const blob = await removeBackground(sourceFile, {
+      publicPath: 'https://staticimgly.com/@imgly/background-removal-data/1.7.0/dist/'
+    });
     const newFile = new File([blob], sourceFile.name.replace(/\.[^/.]+$/, "") + ".png", { type: 'image/png' });
     file.value = newFile;
     const reader = new FileReader();

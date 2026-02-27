@@ -50,15 +50,15 @@ app.use(helmet({
     directives: {
       defaultSrc: ["'self'"],
       imgSrc: ["'self'", 'blob:', 'data:', 'https://staticimgly.com'],
-      connectSrc: ["'self'", 'https://staticimgly.com'],
-      scriptSrc: ["'self'", "'wasm-unsafe-eval'"],
+      connectSrc: ["'self'", 'blob:', 'data:', 'https://staticimgly.com'],
+      scriptSrc: ["'self'", "'wasm-unsafe-eval'", "blob:", "https://staticimgly.com"],
       workerSrc: ["'self'", 'blob:'],
       objectSrc: ["'none'"],
       upgradeInsecureRequests: []
     }
   },
   crossOriginOpenerPolicy: { policy: "same-origin" },
-  crossOriginEmbedderPolicy: { policy: "require-corp" }
+  crossOriginEmbedderPolicy: false
 }));
 
 const usePostgres = process.env.DB_TYPE === 'postgres';
