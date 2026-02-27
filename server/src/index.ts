@@ -50,8 +50,11 @@ app.use(helmet({
     directives: {
         defaultSrc: ["'self'"],
         imgSrc: ["'self'", 'blob:', 'data:'],
-        connectSrc: ["'self'"],
+        connectSrc: ["'self'", 'blob:', 'data:'],
+        scriptSrc: ["'self'", "'wasm-unsafe-eval'", "blob:"],
+        workerSrc: ["'self'", 'blob:'],
         objectSrc: ["'none'"],
+        upgradeInsecureRequests: []
     }
   },
   crossOriginOpenerPolicy: { policy: "same-origin" },
