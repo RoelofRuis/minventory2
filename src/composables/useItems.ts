@@ -15,10 +15,10 @@ export function useItems(categories: any) {
     selectedJoys, 
     selectedFrequencies, 
     selectedIntentions, 
-    selectedAttachments 
+    selectedAttachments,
+    searchQuery
   } = storeToRefs(filterStore);
   const filterMode = mode;
-  const searchQuery = ref('');
 
   const fetchItems = async () => {
     loading.value = true;
@@ -93,18 +93,26 @@ export function useItems(categories: any) {
     
     const sel = Array.isArray(selectedCategoryIds.value) ? selectedCategoryIds.value : [];
     if (sel.length > 0) {
+      const includesUnset = sel.includes('__unset__');
       if (filterMode.value === 'or') {
         const allDescendantIds = new Set<string>();
         sel.forEach(id => {
-          getDescendantIds(id).forEach(dId => allDescendantIds.add(dId));
+          if (id !== '__unset__') {
+            getDescendantIds(id).forEach(dId => allDescendantIds.add(dId));
+          }
         });
-        result = result.filter(item => 
-          item.categoryIds && item.categoryIds.some((catId: string) => allDescendantIds.has(catId))
-        );
+        result = result.filter(item => {
+          const hasSelectedCat = item.categoryIds && item.categoryIds.some((catId: string) => allDescendantIds.has(catId));
+          const isUnset = !item.categoryIds || item.categoryIds.length === 0;
+          return (includesUnset && isUnset) || hasSelectedCat;
+        });
       } else {
         result = result.filter(item => {
-          if (!item.categoryIds) return false;
           return sel.every(selectedId => {
+            if (selectedId === '__unset__') {
+              return !item.categoryIds || item.categoryIds.length === 0;
+            }
+            if (!item.categoryIds) return false;
             const descendants = getDescendantIds(selectedId);
             return item.categoryIds.some((catId: string) => descendants.includes(catId));
           });
@@ -118,7 +126,7 @@ export function useItems(categories: any) {
     }
 
     if (selectedJoys.value.length > 0) {
-      result = result.filter(i => selectedJoys.value.includes(i.joy || 'medium'));
+      result = result.filter(i => selectedJoys.value.includes(i.joy || 'undefined'));
     }
 
     if (selectedFrequencies.value.length > 0) {

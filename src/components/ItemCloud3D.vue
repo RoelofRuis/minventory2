@@ -1,46 +1,7 @@
 <template>
   <div class="cloud-view">
     <div class="container" style="padding-top: 0; padding-bottom: 0; max-width: 1000px; margin: 0 auto;">
-      <div class="card filter-bar" style="margin-bottom: 10px; margin-top: 10px;">
-        <CategoryFilter 
-          v-model:selectedIds="selectedCategoryIds" 
-          v-model:mode="filterMode" 
-          :categories="visibleCategories" 
-          style="flex: 2;"
-        />
-
-        <div class="stat-filters">
-          <StatFilter 
-            v-model:selectedValues="selectedJoys" 
-            :options="joys" 
-            :icon="Smile" 
-            label="Joy" 
-          />
-          <StatFilter 
-            v-model:selectedValues="selectedFrequencies" 
-            :options="usageFrequencies" 
-            :icon="Zap" 
-            label="Usage" 
-          />
-          <StatFilter 
-            v-model:selectedValues="selectedIntentions" 
-            :options="intentions" 
-            :icon="Target" 
-            label="Intention" 
-          />
-          <StatFilter 
-            v-model:selectedValues="selectedAttachments" 
-            :options="attachments" 
-            :icon="Heart" 
-            label="Attachment" 
-          />
-        </div>
-
-        <div class="selection-count">
-          <span class="count-value">{{ totalIndividualItems }}</span>
-          <span class="count-label">{{ totalIndividualItems === 1 ? 'item' : 'items' }}</span>
-        </div>
-      </div>
+      <FilterBar :categories="visibleCategories" :totalItems="totalIndividualItems" style="margin-top: 10px;" />
     </div>
     
     <div ref="container" class="canvas-container">
@@ -50,29 +11,29 @@
       
       <div v-if="selectedItem" class="item-info-overlay" @click.self="selectedItem = null">
         <div class="item-card sliding-card">
-          <div class="item-image-wrapper" style="height: 120px;">
-            <div class="quantity-badge">{{ selectedItem.quantity }}</div>
+          <div class="item-image-wrapper">
+            <div class="quantity-badge" :title="'Quantity: ' + selectedItem.quantity">{{ selectedItem.quantity }}</div>
             <img v-if="selectedItem.image" :src="selectedItem.image" style="height: 100%; width: 100%; object-fit: cover;" />
             <div v-else style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;">
               <Package :size="32" :stroke-width="1.5" class="silver-text" style="opacity: 0.8;" />
             </div>
             <h3 class="item-title-overlay">
-              <Lock v-if="selectedItem.private" :size="12" color="#f59e0b" style="margin-right: 4px; vertical-align: middle;" />
+              <Lock v-if="selectedItem.private" :size="12" color="#f59e0b" style="margin-right: 4px; vertical-align: middle;" title="Private" />
               {{ selectedItem.name }}
             </h3>
           </div>
 
           <div class="item-stats-row" v-if="isDefined(selectedItem.joy) || isDefined(selectedItem.usageFrequency) || isDefined(selectedItem.intention) || isDefined(selectedItem.attachment)">
-            <div v-if="isDefined(selectedItem.joy)" class="item-stat" title="Joy">
+            <div v-if="isDefined(selectedItem.joy)" class="item-stat" :title="'Joy: ' + formatStat(selectedItem.joy)">
               <Smile :size="14" :style="{ color: getStatColor(selectedItem.joy || 'medium') }" /> <span class="stat-text">{{ formatStat(selectedItem.joy) }}</span>
             </div>
-            <div v-if="isDefined(selectedItem.usageFrequency)" class="item-stat" title="Usage">
+            <div v-if="isDefined(selectedItem.usageFrequency)" class="item-stat" :title="'Usage: ' + formatStat(selectedItem.usageFrequency)">
               <Zap :size="14" :style="{ color: getStatColor(selectedItem.usageFrequency || 'undefined') }" /> <span class="stat-text">{{ formatStat(selectedItem.usageFrequency) }}</span>
             </div>
-            <div v-if="isDefined(selectedItem.intention)" class="item-stat" title="Intention">
+            <div v-if="isDefined(selectedItem.intention)" class="item-stat" :title="'Intention: ' + formatStat(selectedItem.intention)">
               <Target :size="14" :style="{ color: getStatColor(selectedItem.intention || 'undecided') }" /> <span class="stat-text">{{ formatStat(selectedItem.intention) }}</span>
             </div>
-            <div v-if="isDefined(selectedItem.attachment)" class="item-stat" title="Attachment">
+            <div v-if="isDefined(selectedItem.attachment)" class="item-stat" :title="'Attachment: ' + formatStat(selectedItem.attachment)">
               <Heart :size="14" :style="{ color: getStatColor(selectedItem.attachment || 'undefined') }" /> <span class="stat-text">{{ formatStat(selectedItem.attachment) }}</span>
             </div>
           </div>
@@ -100,19 +61,16 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import axios from 'axios';
 import { useAuthStore } from '../stores/auth';
 import { Package, Lock, Smile, Zap, Target, Heart } from 'lucide-vue-next';
-import CategoryFilter from './CategoryFilter.vue';
-import StatFilter from './StatFilter.vue';
+import FilterBar from './FilterBar.vue';
 import { useCategories } from '../composables/useCategories';
 import { useItems } from '../composables/useItems';
 import { formatStat, isDefined, getStatColor } from '../utils/formatters';
-import { usageFrequencies, attachments, intentions, joys } from '../utils/constants';
 
 const authStore = useAuthStore();
 const { categories, fetchCategories, getCategoryName, getCategoryColor } = useCategories();
 const visibleCategories = computed(() => authStore.showPrivate ? categories.value : categories.value.filter(c => !c.private));
 const { 
-  items, loading, selectedCategoryIds, filterMode,
-  selectedJoys, selectedFrequencies, selectedIntentions, selectedAttachments,
+  items, loading, 
   fetchItems, filteredItems, totalIndividualItems
 } = useItems(categories);
 
@@ -706,7 +664,7 @@ onUnmounted(() => {
 .sliding-card {
   position: relative;
   width: 100%;
-  max-width: 350px;
+  max-width: 280px;
   margin-bottom: 20px;
   animation: slide-up 0.3s ease-out;
   box-shadow: 0 20px 25px -5px rgba(0,0,0,0.3), 0 10px 10px -5px rgba(0,0,0,0.04);

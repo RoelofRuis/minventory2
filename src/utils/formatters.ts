@@ -1,5 +1,5 @@
 export const formatStat = (val: any) => {
-  if (val === undefined || val === null || val === 'undefined' || val === 'undecided') return '-';
+  if (val === undefined || val === null || val === 'undefined' || val === 'undecided') return 'Unset';
   const s = String(val);
   return s.charAt(0).toUpperCase() + s.slice(1);
 };

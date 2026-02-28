@@ -58,11 +58,14 @@ const showCategoryDropdown = ref(false);
 const dropdownRef = ref<HTMLElement | null>(null);
 const categorySearchInput = ref<HTMLInputElement | null>(null);
 
-const getCategoryName = (id: string) => props.categories.find(c => c.id === id)?.name || 'Unknown';
+const getCategoryName = (id: string) => {
+  if (id === '__unset__') return '(No Category)';
+  return props.categories.find(c => c.id === id)?.name || 'Unknown';
+};
 
 const sortedCategories = computed(() => {
   const cats = props.categories;
-  const result: any[] = [];
+  const result: any[] = [{ id: '__unset__', name: '(No Category)', level: 0 }];
   const addChildren = (parentId: string | null, level: number) => {
     const children = cats
       .filter(c => (c.parentId || null) === parentId)

@@ -26,8 +26,10 @@
   <!-- Settings Modal -->
   <div v-if="showSettingsModal" class="modal-overlay" @click.self="showSettingsModal = false">
     <div class="modal-content" style="max-width: 420px;">
-      <X class="modal-close" :size="20" @click="showSettingsModal = false" />
-      <h2 class="accent-text">Settings</h2>
+      <div class="modal-header">
+        <h2 class="accent-text">Settings</h2>
+        <X class="modal-close" :size="20" @click="showSettingsModal = false" />
+      </div>
       <div class="form-group" style="display:flex; align-items:center; justify-content: space-between; gap: 12px; margin-top: 12px;">
         <div style="display: flex; align-items: center; gap: 12px;">
           <div>
@@ -107,8 +109,10 @@
   <!-- Unlock Private Modal -->
   <div v-if="showUnlockModal" class="modal-overlay" @click.self="closeUnlockModal">
     <div class="modal-content" style="max-width: 400px;">
-      <X class="modal-close" :size="20" @click="closeUnlockModal" />
-      <h2 class="accent-text">{{ pendingEnableEdit ? 'Unlock for Editing' : 'Unlock Private Items' }}</h2>
+      <div class="modal-header">
+        <h2 class="accent-text">{{ pendingEnableEdit ? 'Unlock for Editing' : 'Unlock Private Items' }}</h2>
+        <X class="modal-close" :size="20" @click="closeUnlockModal" />
+      </div>
       <p class="silver-text" style="margin-bottom: 20px;">
         {{ pendingEnableEdit ? 'Please enter your password to enable editing. This also reveals hidden items.' : 'Please enter your password to reveal hidden items.' }}
       </p>

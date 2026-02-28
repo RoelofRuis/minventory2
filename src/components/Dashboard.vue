@@ -13,57 +13,18 @@
       </button>
     </div>
 
+    <div v-if="authStore.editMode && (currentTab === 'items' || currentTab === 'categories')" class="actions-row">
+      <button v-if="currentTab === 'items'" class="btn-primary" @click="openItemModal()">
+        <Plus :size="20" style="vertical-align: middle;" /> Add Item
+      </button>
+      <button v-if="currentTab === 'categories'" class="btn-primary" @click="openCategoryModal()">
+        <Plus :size="20" style="vertical-align: middle;" /> Add Category
+      </button>
+    </div>
+
     <!-- Items Tab -->
     <div v-if="currentTab === 'items'">
-      <div class="card filter-bar">
-        <button v-if="authStore.editMode" class="btn-primary" style="white-space: nowrap;" @click="openItemModal()">
-          <Plus :size="20" style="vertical-align: middle;" /> Add Item
-        </button>
-        <div class="search-wrapper">
-          <input v-model="searchQuery" type="text" placeholder="Search items..." />
-          <button v-if="searchQuery" class="clear-button" @click="searchQuery = ''" title="Clear search">
-            <X :size="16" />
-          </button>
-        </div>
-        
-        <CategoryFilter 
-          v-model:selectedIds="selectedCategoryIds" 
-          v-model:mode="filterMode" 
-          :categories="visibleCategories" 
-          style="flex: 2;"
-        />
-
-        <div class="stat-filters">
-          <StatFilter 
-            v-model:selectedValues="selectedJoys" 
-            :options="joys" 
-            :icon="Smile" 
-            label="Joy" 
-          />
-          <StatFilter 
-            v-model:selectedValues="selectedFrequencies" 
-            :options="usageFrequencies" 
-            :icon="Zap" 
-            label="Usage" 
-          />
-          <StatFilter 
-            v-model:selectedValues="selectedIntentions" 
-            :options="intentions" 
-            :icon="Target" 
-            label="Intention" 
-          />
-          <StatFilter 
-            v-model:selectedValues="selectedAttachments" 
-            :options="attachments" 
-            :icon="Heart" 
-            label="Attachment" 
-          />
-        </div>
-        <div class="selection-count">
-          <span class="count-value">{{ totalIndividualItems }}</span>
-          <span class="count-label">{{ totalIndividualItems === 1 ? 'item' : 'items' }}</span>
-        </div>
-      </div>
+      <FilterBar :categories="visibleCategories" :totalItems="totalIndividualItems" />
 
       <div v-if="loading && items.length === 0" class="silver-text">Loading items...</div>
       <div v-else-if="filteredItems.length === 0" class="silver-text">No items found.</div>
@@ -72,28 +33,28 @@
         <div v-for="item in filteredItems" :key="item.id" class="item-card">
           <div @click="viewItemDetails(item)" style="cursor: pointer;">
             <div class="item-image-wrapper">
-              <div class="quantity-badge">{{ item.quantity }}</div>
+              <div class="quantity-badge" :title="'Quantity: ' + item.quantity">{{ item.quantity }}</div>
               <img v-if="item.image" :src="item.image" />
               <div v-else style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;">
                 <Package :size="32" :stroke-width="1.5" class="silver-text" style="opacity: 0.8;" />
               </div>
               <h3 class="item-title-overlay">
-                <Lock v-if="item.private" :size="12" color="#f59e0b" style="margin-right: 4px; vertical-align: middle;" />
+                <Lock v-if="item.private" :size="12" color="#f59e0b" style="margin-right: 4px; vertical-align: middle;" title="Private" />
                 {{ item.name }}
               </h3>
             </div>
 
             <div class="item-stats-row" v-if="isDefined(item.joy) || isDefined(item.usageFrequency) || isDefined(item.intention) || isDefined(item.attachment)">
-              <div v-if="isDefined(item.joy)" class="item-stat" title="Joy">
+              <div v-if="isDefined(item.joy)" class="item-stat" :title="'Joy: ' + formatStat(item.joy)">
                 <Smile :size="14" :style="{ color: getStatColor(item.joy || 'medium') }" /> <span class="stat-text">{{ formatStat(item.joy) }}</span>
               </div>
-              <div v-if="isDefined(item.usageFrequency)" class="item-stat" title="Usage">
+              <div v-if="isDefined(item.usageFrequency)" class="item-stat" :title="'Usage: ' + formatStat(item.usageFrequency)">
                 <Zap :size="14" :style="{ color: getStatColor(item.usageFrequency || 'undefined') }" /> <span class="stat-text">{{ formatStat(item.usageFrequency) }}</span>
               </div>
-              <div v-if="isDefined(item.intention)" class="item-stat" title="Intention">
+              <div v-if="isDefined(item.intention)" class="item-stat" :title="'Intention: ' + formatStat(item.intention)">
                 <Target :size="14" :style="{ color: getStatColor(item.intention || 'undecided') }" /> <span class="stat-text">{{ formatStat(item.intention) }}</span>
               </div>
-              <div v-if="isDefined(item.attachment)" class="item-stat" title="Attachment">
+              <div v-if="isDefined(item.attachment)" class="item-stat" :title="'Attachment: ' + formatStat(item.attachment)">
                 <Heart :size="14" :style="{ color: getStatColor(item.attachment || 'undefined') }" /> <span class="stat-text">{{ formatStat(item.attachment) }}</span>
               </div>
             </div>
@@ -113,9 +74,6 @@
     <!-- Categories Tab -->
     <div v-if="currentTab === 'categories'">
       <div class="card filter-bar">
-        <button v-if="authStore.editMode" class="btn-primary" style="width: auto;" @click="openCategoryModal()">
-          <Plus :size="20" style="vertical-align: middle;" /> Add Category
-        </button>
         <div class="search-wrapper" style="flex: 1;">
           <input v-model="categorySearch" type="text" placeholder="Search categories..." />
           <button v-if="categorySearch" class="clear-button" @click="categorySearch = ''" title="Clear search">
@@ -130,15 +88,15 @@
       <div class="grid" v-else>
         <div v-for="cat in filteredCategories" :key="cat.id" class="item-card" @click="authStore.editMode && openCategoryModal(cat)" :style="{ borderColor: cat.color || 'var(--border-color)', cursor: authStore.editMode ? 'pointer' : 'default' }">
           <h3 :style="{ color: cat.color || 'var(--accent-purple)', margin: '0 0 8px 0' }">
-            <Lock v-if="cat.isPrivate" :size="14" :color="cat.private ? '#ef4444' : '#f59e0b'" style="margin-right: 6px; vertical-align: middle;" />
+            <Lock v-if="cat.isPrivate" :size="14" :color="cat.private ? '#ef4444' : '#f59e0b'" style="margin-right: 6px; vertical-align: middle;" title="Private" />
             {{ cat.name }}
           </h3>
           <p class="silver-text" style="font-size: 0.9rem; margin-bottom: 8px;">{{ cat.description || 'No description' }}</p>
           <div class="item-stats-row" style="margin-top: auto;">
-            <div class="item-stat" title="Items">
+            <div class="item-stat" :title="'Items: ' + cat.count">
               <Package :size="14" /> <span>{{ cat.count }}</span>
             </div>
-            <div v-if="cat.intentionalCount" class="item-stat" title="Target">
+            <div v-if="cat.intentionalCount" class="item-stat" :title="'Target: ' + cat.intentionalCount">
               <Target :size="14" /> <span>{{ cat.intentionalCount }}</span>
             </div>
           </div>
@@ -171,8 +129,10 @@
     <!-- Item Modal -->
     <div v-if="authStore.editMode && showItemModal" class="modal-overlay" @click.self="showItemModal = false">
       <div class="modal-content">
-        <X class="modal-close" :size="20" @click="showItemModal = false" />
-        <h2 class="accent-text">{{ editingItem ? 'Edit Item' : 'Add New Item' }}</h2>
+        <div class="modal-header">
+          <h2 class="accent-text">{{ editingItem ? 'Edit Item' : 'Add New Item' }}</h2>
+          <X class="modal-close" :size="20" @click="showItemModal = false" />
+        </div>
         
         <div v-if="editingItem" class="actions" style="margin-top: 10px; margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 20px;">
           <button type="button" class="btn-secondary" title="Transactions" @click="openTransactionModal(editingItem)">
@@ -186,93 +146,175 @@
           </button>
         </div>
         <form @submit.prevent="saveItem()">
-          <div class="form-group">
-            <label>Name</label>
-            <input v-model="itemForm.name" ref="itemNameInput" type="text" required />
-            <div v-if="closeMatches.length > 0" class="close-matches-list">
-              <div v-for="match in closeMatches" :key="match.id" class="close-match-item">
-                <span class="match-name">{{ match.name }}</span>
-                <span v-if="match.categoryIds?.[0]" class="match-category">
-                  ({{ getCategoryName(match.categoryIds[0]) }})
-                </span>
-              </div>
-            </div>
-          </div>
-          
-          <div class="form-group">
-            <label>Image</label>
-            <div style="text-align: center;">
-              <input type="file" ref="fileInputRef" accept="image/*" capture="environment" @change="handleFileChange" style="display: none;" />
-              <button type="button" class="btn-secondary" style="width: 100%; margin-bottom: 10px;" @click="triggerFileInput">
-                <Camera :size="20" style="vertical-align: middle; margin-right: 8px;" />
-                {{ preview ? 'Change Photo' : 'Take Picture' }}
-              </button>
-              <img v-if="preview" :src="preview" style="max-width: 100%; border-radius: 8px; margin-top: 10px;" />
-              
-              <div v-if="preview" style="margin-top: 12px; display: flex; flex-direction: column; align-items: center; gap: 10px;">
-                <div style="display: flex; align-items: center; gap: 12px;">
-                  <label class="switch-container">
-                    <input type="checkbox" v-model="isolateObject" @change="handleIsolateChange" :disabled="processingBackground" />
-                    <div class="switch-track">
-                      <div class="switch-thumb"></div>
-                    </div>
-                    <span class="silver-text" style="font-size: 14px;">Isolate Object</span>
-                  </label>
-                  <Loader2 v-if="processingBackground" class="animate-spin accent-purple" :size="18" />
+          <template v-if="editingItem">
+            <!-- Categories first when editing -->
+            <div class="form-group">
+              <label>Categories</label>
+              <div style="display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 10px;">
+                <div v-for="cat in categories" :key="cat.id" 
+                     class="item-badge" 
+                     :style="{ cursor: 'pointer', backgroundColor: itemForm.categoryIds.includes(cat.id) ? (cat.color || 'var(--accent-purple)') : 'var(--input-bg)', color: itemForm.categoryIds.includes(cat.id) ? 'white' : 'var(--accent-silver)' }"
+                     @click="toggleCategory(cat.id)">
+                  {{ cat.name }}
                 </div>
-                <button type="button" class="btn-danger btn-small" @click="removeImage">Remove Image</button>
               </div>
             </div>
-          </div>
 
-          <div style="display: grid; grid-template-columns: 1fr; gap: 15px;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+              <div class="form-group">
+                <label>Usage Frequency</label>
+                <select v-model="itemForm.usageFrequency">
+                  <option v-for="opt in usageFrequencies" :key="opt" :value="opt">{{ opt }}</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Attachment</label>
+                <select v-model="itemForm.attachment">
+                  <option v-for="opt in attachments" :key="opt" :value="opt">{{ opt }}</option>
+                </select>
+              </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+              <div class="form-group">
+                <label>Intention</label>
+                <select v-model="itemForm.intention">
+                  <option v-for="opt in intentions" :key="opt" :value="opt">{{ opt }}</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Joy</label>
+                <select v-model="itemForm.joy">
+                  <option v-for="opt in joys" :key="opt" :value="opt">{{ opt }}</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-group" style="margin-top: 10px; border-top: 1px solid var(--border-color); padding-top: 15px;">
+              <label>Name</label>
+              <input v-model="itemForm.name" ref="itemNameInput" type="text" required />
+            </div>
+
             <div class="form-group">
               <label>Quantity</label>
-              <input v-model="itemForm.quantity" type="number" step="any" :disabled="!!editingItem" />
+              <input v-model="itemForm.quantity" type="number" step="any" :disabled="true" />
             </div>
-          </div>
 
-          <div class="form-group">
-            <label>Categories</label>
-            <div style="display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 10px;">
-              <div v-for="cat in categories" :key="cat.id" 
-                   class="item-badge" 
-                   :style="{ cursor: 'pointer', backgroundColor: itemForm.categoryIds.includes(cat.id) ? (cat.color || 'var(--accent-purple)') : 'var(--input-bg)', color: itemForm.categoryIds.includes(cat.id) ? 'white' : 'var(--accent-silver)' }"
-                   @click="toggleCategory(cat.id)">
-                {{ cat.name }}
+            <div class="form-group">
+              <label>Image</label>
+              <div style="text-align: center;">
+                <input type="file" ref="fileInputRef" accept="image/*" capture="environment" @change="handleFileChange" style="display: none;" />
+                <button type="button" class="btn-secondary" style="width: 100%; margin-bottom: 10px;" @click="triggerFileInput">
+                  <Camera :size="20" style="vertical-align: middle; margin-right: 8px;" />
+                  {{ preview ? 'Change Photo' : 'Take Picture' }}
+                </button>
+                <img v-if="preview" :src="preview" style="max-width: 100%; border-radius: 8px; margin-top: 10px;" />
+                
+                <div v-if="preview" style="margin-top: 12px; display: flex; flex-direction: column; align-items: center; gap: 10px;">
+                  <div style="display: flex; align-items: center; gap: 12px;">
+                    <label class="switch-container">
+                      <input type="checkbox" v-model="isolateObject" @change="handleIsolateChange" :disabled="processingBackground" />
+                      <div class="switch-track">
+                        <div class="switch-thumb"></div>
+                      </div>
+                      <span class="silver-text" style="font-size: 14px;">Isolate Object</span>
+                    </label>
+                    <Loader2 v-if="processingBackground" class="animate-spin accent-purple" :size="18" />
+                  </div>
+                  <button type="button" class="btn-danger btn-small" @click="removeImage">Remove Image</button>
+                </div>
               </div>
             </div>
-          </div>
+          </template>
 
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+          <template v-else>
+            <!-- Basic info first when creating -->
             <div class="form-group">
-              <label>Usage Frequency</label>
-              <select v-model="itemForm.usageFrequency">
-                <option v-for="opt in usageFrequencies" :key="opt" :value="opt">{{ opt }}</option>
-              </select>
+              <label>Name</label>
+              <input v-model="itemForm.name" ref="itemNameInput" type="text" required />
+              <div v-if="closeMatches.length > 0" class="close-matches-list">
+                <div v-for="match in closeMatches" :key="match.id" class="close-match-item">
+                  <span class="match-name">{{ match.name }}</span>
+                  <span v-if="match.categoryIds?.[0]" class="match-category">
+                    ({{ getCategoryName(match.categoryIds[0]) }})
+                  </span>
+                </div>
+              </div>
             </div>
+            
             <div class="form-group">
-              <label>Attachment</label>
-              <select v-model="itemForm.attachment">
-                <option v-for="opt in attachments" :key="opt" :value="opt">{{ opt }}</option>
-              </select>
+              <label>Image</label>
+              <div style="text-align: center;">
+                <input type="file" ref="fileInputRef" accept="image/*" capture="environment" @change="handleFileChange" style="display: none;" />
+                <button type="button" class="btn-secondary" style="width: 100%; margin-bottom: 10px;" @click="triggerFileInput">
+                  <Camera :size="20" style="vertical-align: middle; margin-right: 8px;" />
+                  {{ preview ? 'Change Photo' : 'Take Picture' }}
+                </button>
+                <img v-if="preview" :src="preview" style="max-width: 100%; border-radius: 8px; margin-top: 10px;" />
+                
+                <div v-if="preview" style="margin-top: 12px; display: flex; flex-direction: column; align-items: center; gap: 10px;">
+                  <div style="display: flex; align-items: center; gap: 12px;">
+                    <label class="switch-container">
+                      <input type="checkbox" v-model="isolateObject" @change="handleIsolateChange" :disabled="processingBackground" />
+                      <div class="switch-track">
+                        <div class="switch-thumb"></div>
+                      </div>
+                      <span class="silver-text" style="font-size: 14px;">Isolate Object</span>
+                    </label>
+                    <Loader2 v-if="processingBackground" class="animate-spin accent-purple" :size="18" />
+                  </div>
+                  <button type="button" class="btn-danger btn-small" @click="removeImage">Remove Image</button>
+                </div>
+              </div>
             </div>
-          </div>
 
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
             <div class="form-group">
-              <label>Intention</label>
-              <select v-model="itemForm.intention">
-                <option v-for="opt in intentions" :key="opt" :value="opt">{{ opt }}</option>
-              </select>
+              <label>Quantity</label>
+              <input v-model="itemForm.quantity" type="number" step="any" />
             </div>
-            <div class="form-group">
-              <label>Joy</label>
-              <select v-model="itemForm.joy">
-                <option v-for="opt in joys" :key="opt" :value="opt">{{ opt }}</option>
-              </select>
+
+            <div class="form-group" style="margin-top: 10px; border-top: 1px solid var(--border-color); padding-top: 15px;">
+              <label>Categories</label>
+              <div style="display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 10px;">
+                <div v-for="cat in categories" :key="cat.id" 
+                     class="item-badge" 
+                     :style="{ cursor: 'pointer', backgroundColor: itemForm.categoryIds.includes(cat.id) ? (cat.color || 'var(--accent-purple)') : 'var(--input-bg)', color: itemForm.categoryIds.includes(cat.id) ? 'white' : 'var(--accent-silver)' }"
+                     @click="toggleCategory(cat.id)">
+                  {{ cat.name }}
+                </div>
+              </div>
             </div>
-          </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+              <div class="form-group">
+                <label>Usage Frequency</label>
+                <select v-model="itemForm.usageFrequency">
+                  <option v-for="opt in usageFrequencies" :key="opt" :value="opt">{{ opt }}</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Attachment</label>
+                <select v-model="itemForm.attachment">
+                  <option v-for="opt in attachments" :key="opt" :value="opt">{{ opt }}</option>
+                </select>
+              </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+              <div class="form-group">
+                <label>Intention</label>
+                <select v-model="itemForm.intention">
+                  <option v-for="opt in intentions" :key="opt" :value="opt">{{ opt }}</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Joy</label>
+                <select v-model="itemForm.joy">
+                  <option v-for="opt in joys" :key="opt" :value="opt">{{ opt }}</option>
+                </select>
+              </div>
+            </div>
+          </template>
 
           <div class="actions">
             <button type="submit" class="btn-primary" :disabled="saving" style="flex: 1; width: auto;">{{ saving ? 'Saving...' : 'Save' }}</button>
@@ -287,8 +329,10 @@
     <!-- Category Modal -->
     <div v-if="authStore.editMode && showCategoryModal" class="modal-overlay" @click.self="showCategoryModal = false">
       <div class="modal-content">
-        <X class="modal-close" :size="20" @click="showCategoryModal = false" />
-        <h2 class="accent-text">{{ editingCategory ? 'Edit Category' : 'Add Category' }}</h2>
+        <div class="modal-header">
+          <h2 class="accent-text">{{ editingCategory ? 'Edit Category' : 'Add Category' }}</h2>
+          <X class="modal-close" :size="20" @click="showCategoryModal = false" />
+        </div>
         <form @submit.prevent="saveCategory">
           <div class="form-group">
             <label>Name</label>
@@ -335,8 +379,10 @@
     <!-- Transaction Modal -->
     <div v-if="authStore.editMode && showTransactionModal" class="modal-overlay" @click.self="showTransactionModal = false">
       <div class="modal-content">
-        <X class="modal-close" :size="20" @click="showTransactionModal = false" />
-        <h2 class="accent-text">Adjust Quantity: {{ selectedItem?.name }}</h2>
+        <div class="modal-header">
+          <h2 class="accent-text">Adjust Quantity: {{ selectedItem?.name }}</h2>
+          <X class="modal-close" :size="20" @click="showTransactionModal = false" />
+        </div>
         <p class="silver-text">Current Quantity: {{ selectedItem?.quantity }}</p>
         <form @submit.prevent="saveTransaction">
           <div class="form-group">
@@ -381,8 +427,10 @@
     <!-- Loan Modal -->
     <div v-if="authStore.editMode && showLoanModal" class="modal-overlay" @click.self="showLoanModal = false">
       <div class="modal-content">
-        <X class="modal-close" :size="20" @click="showLoanModal = false" />
-        <h2 class="accent-text">Lend Item: {{ selectedItem?.name }}</h2>
+        <div class="modal-header">
+          <h2 class="accent-text">Lend Item: {{ selectedItem?.name }}</h2>
+          <X class="modal-close" :size="20" @click="showLoanModal = false" />
+        </div>
         <form @submit.prevent="saveLoan">
           <div class="form-group">
             <label>Borrower Name</label>
@@ -405,18 +453,20 @@
 
     <div v-if="showDetailModal" class="modal-overlay" @click.self="showDetailModal = false">
       <div class="modal-content" style="max-width: 500px;">
-        <X class="modal-close" :size="20" @click="showDetailModal = false" />
+        <div class="modal-header">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <button v-if="modalView !== 'detail'" class="btn-secondary btn-small" style="padding: 4px 8px;" @click="modalView = 'detail'">
+              <ArrowLeft :size="16" />
+            </button>
+            <h2 class="accent-text" style="display: flex; align-items: center; gap: 8px;">
+              <Lock v-if="modalView === 'detail' && selectedItem?.private" :size="20" style="color: #f59e0b;" />
+              {{ detailModalTitle }}
+            </h2>
+          </div>
+          <X class="modal-close" :size="20" @click="showDetailModal = false" />
+        </div>
         
-        <!-- Back Button -->
-        <button v-if="modalView !== 'detail'" class="btn-secondary btn-small" style="margin-bottom: 15px;" @click="modalView = 'detail'">
-          <ArrowLeft :size="16" style="vertical-align: middle; margin-right: 4px;" /> Back
-        </button>
-
         <div v-if="modalView === 'detail'">
-          <h2 class="app-title" style="margin-bottom: 20px;">
-            <Lock v-if="selectedItem?.private" :size="20" style="margin-right: 8px; vertical-align: middle; color: #f59e0b;" />
-            {{ selectedItem?.name }}
-          </h2>
           
           <img v-if="selectedItem?.image" :src="selectedItem.image" style="width: 200px; height: 200px; object-fit: cover; border-radius: 12px; margin: 0 auto 20px auto; display: block;" />
           <div v-else style="width: 200px; height: 200px; display: flex; align-items: center; justify-content: center; background-color: var(--input-bg); border-radius: 12px; margin: 0 auto 20px auto;">
@@ -441,23 +491,38 @@
           <div class="stats-grid">
             <div class="stat-card">
               <div class="stat-label">Quantity</div>
-              <div class="stat-value">{{ selectedItem?.quantity }}</div>
+              <div class="stat-value" style="display: flex; align-items: center; justify-content: center; gap: 6px;">
+                <Package :size="16" class="silver-text" />
+                {{ selectedItem?.quantity }}
+              </div>
             </div>
             <div v-if="isDefined(selectedItem?.usageFrequency)" class="stat-card">
               <div class="stat-label">Usage</div>
-              <div class="stat-value">{{ formatStat(selectedItem?.usageFrequency) }}</div>
+              <div class="stat-value" :style="{ color: getStatColor(selectedItem?.usageFrequency || 'undefined'), display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }">
+                <Zap :size="16" />
+                {{ formatStat(selectedItem?.usageFrequency) }}
+              </div>
             </div>
             <div v-if="isDefined(selectedItem?.joy)" class="stat-card">
               <div class="stat-label">Joy</div>
-              <div class="stat-value">{{ formatStat(selectedItem?.joy) }}</div>
+              <div class="stat-value" :style="{ color: getStatColor(selectedItem?.joy || 'medium'), display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }">
+                <Smile :size="16" />
+                {{ formatStat(selectedItem?.joy) }}
+              </div>
             </div>
             <div v-if="isDefined(selectedItem?.intention)" class="stat-card">
               <div class="stat-label">Intention</div>
-              <div class="stat-value">{{ formatStat(selectedItem?.intention) }}</div>
+              <div class="stat-value" :style="{ color: getStatColor(selectedItem?.intention || 'undecided'), display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }">
+                <Target :size="16" />
+                {{ formatStat(selectedItem?.intention) }}
+              </div>
             </div>
             <div v-if="isDefined(selectedItem?.attachment)" class="stat-card">
               <div class="stat-label">Attachment</div>
-              <div class="stat-value">{{ formatStat(selectedItem?.attachment) }}</div>
+              <div class="stat-value" :style="{ color: getStatColor(selectedItem?.attachment || 'undefined'), display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }">
+                <Heart :size="16" />
+                {{ formatStat(selectedItem?.attachment) }}
+              </div>
             </div>
           </div>
 
@@ -472,7 +537,6 @@
 
         <!-- Edit View -->
         <div v-else-if="modalView === 'edit'">
-          <h2 class="accent-text">{{ editingItem ? 'Edit Item' : 'Add New Item' }}</h2>
 
           <div v-if="editingItem" class="actions" style="margin-top: 10px; margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 20px;">
             <button type="button" class="btn-secondary" title="Transactions" @click="openTransactionModal(editingItem)">
@@ -487,78 +551,156 @@
           </div>
 
           <form @submit.prevent="saveItem()">
-            <div class="form-group">
-              <label>Name</label>
-              <input v-model="itemForm.name" ref="itemNameInput" type="text" required />
-            </div>
-            
-            <div class="form-group">
-              <label>Image</label>
-              <div style="text-align: center;">
-                <input type="file" ref="fileInputRef" accept="image/*" capture="environment" @change="handleFileChange" style="display: none;" />
-                <button type="button" class="btn-secondary" style="width: 100%; margin-bottom: 10px;" @click="triggerFileInput">
-                  <Camera :size="20" style="vertical-align: middle; margin-right: 8px;" />
-                  {{ preview ? 'Change Photo' : 'Take Picture' }}
-                </button>
-                <img v-if="preview" :src="preview" style="max-width: 100%; border-radius: 8px; margin-top: 10px;" />
-                
-                <div v-if="preview" style="margin-top: 12px; display: flex; flex-direction: column; align-items: center; gap: 10px;">
-                  <div style="display: flex; align-items: center; gap: 12px;">
-                    <label class="switch-container">
-                      <input type="checkbox" v-model="isolateObject" @change="handleIsolateChange" :disabled="processingBackground" />
-                      <div class="switch-track">
-                        <div class="switch-thumb"></div>
-                      </div>
-                      <span class="silver-text" style="font-size: 14px;">Isolate Object</span>
-                    </label>
-                    <Loader2 v-if="processingBackground" class="animate-spin accent-purple" :size="18" />
+            <template v-if="editingItem">
+              <!-- Categories first when editing -->
+              <div class="form-group">
+                <label>Categories</label>
+                <div style="display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 10px;">
+                  <div v-for="cat in categories" :key="cat.id" 
+                      class="item-badge" 
+                      :style="{ cursor: 'pointer', backgroundColor: itemForm.categoryIds.includes(cat.id) ? (cat.color || 'var(--accent-purple)') : 'var(--input-bg)', color: itemForm.categoryIds.includes(cat.id) ? 'white' : 'var(--accent-silver)' }"
+                      @click="toggleCategory(cat.id)">
+                    {{ cat.name }}
                   </div>
-                  <button type="button" class="btn-danger btn-small" @click="removeImage">Remove Image</button>
                 </div>
               </div>
-            </div>
 
-            <div class="form-group">
-              <label>Categories</label>
-              <div style="display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 10px;">
-                <div v-for="cat in categories" :key="cat.id" 
-                    class="item-badge" 
-                    :style="{ cursor: 'pointer', backgroundColor: itemForm.categoryIds.includes(cat.id) ? (cat.color || 'var(--accent-purple)') : 'var(--input-bg)', color: itemForm.categoryIds.includes(cat.id) ? 'white' : 'var(--accent-silver)' }"
-                    @click="toggleCategory(cat.id)">
-                  {{ cat.name }}
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                <div class="form-group">
+                  <label>Usage Frequency</label>
+                  <select v-model="itemForm.usageFrequency">
+                    <option v-for="opt in usageFrequencies" :key="opt" :value="opt">{{ opt }}</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>Attachment</label>
+                  <select v-model="itemForm.attachment">
+                    <option v-for="opt in attachments" :key="opt" :value="opt">{{ opt }}</option>
+                  </select>
                 </div>
               </div>
-            </div>
 
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-              <div class="form-group">
-                <label>Usage Frequency</label>
-                <select v-model="itemForm.usageFrequency">
-                  <option v-for="opt in usageFrequencies" :key="opt" :value="opt">{{ opt }}</option>
-                </select>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                <div class="form-group">
+                  <label>Intention</label>
+                  <select v-model="itemForm.intention">
+                    <option v-for="opt in intentions" :key="opt" :value="opt">{{ opt }}</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>Joy</label>
+                  <select v-model="itemForm.joy">
+                    <option v-for="opt in joys" :key="opt" :value="opt">{{ opt }}</option>
+                  </select>
+                </div>
               </div>
-              <div class="form-group">
-                <label>Attachment</label>
-                <select v-model="itemForm.attachment">
-                  <option v-for="opt in attachments" :key="opt" :value="opt">{{ opt }}</option>
-                </select>
-              </div>
-            </div>
 
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-              <div class="form-group">
-                <label>Intention</label>
-                <select v-model="itemForm.intention">
-                  <option v-for="opt in intentions" :key="opt" :value="opt">{{ opt }}</option>
-                </select>
+              <div class="form-group" style="margin-top: 10px; border-top: 1px solid var(--border-color); padding-top: 15px;">
+                <label>Name</label>
+                <input v-model="itemForm.name" ref="itemNameInput" type="text" required />
               </div>
+              
               <div class="form-group">
-                <label>Joy</label>
-                <select v-model="itemForm.joy">
-                  <option v-for="opt in joys" :key="opt" :value="opt">{{ opt }}</option>
-                </select>
+                <label>Image</label>
+                <div style="text-align: center;">
+                  <input type="file" ref="fileInputRef" accept="image/*" capture="environment" @change="handleFileChange" style="display: none;" />
+                  <button type="button" class="btn-secondary" style="width: 100%; margin-bottom: 10px;" @click="triggerFileInput">
+                    <Camera :size="20" style="vertical-align: middle; margin-right: 8px;" />
+                    {{ preview ? 'Change Photo' : 'Take Picture' }}
+                  </button>
+                  <img v-if="preview" :src="preview" style="max-width: 100%; border-radius: 8px; margin-top: 10px;" />
+                  
+                  <div v-if="preview" style="margin-top: 12px; display: flex; flex-direction: column; align-items: center; gap: 10px;">
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                      <label class="switch-container">
+                        <input type="checkbox" v-model="isolateObject" @change="handleIsolateChange" :disabled="processingBackground" />
+                        <div class="switch-track">
+                          <div class="switch-thumb"></div>
+                        </div>
+                        <span class="silver-text" style="font-size: 14px;">Isolate Object</span>
+                      </label>
+                      <Loader2 v-if="processingBackground" class="animate-spin accent-purple" :size="18" />
+                    </div>
+                    <button type="button" class="btn-danger btn-small" @click="removeImage">Remove Image</button>
+                  </div>
+                </div>
               </div>
-            </div>
+            </template>
+            <template v-else>
+              <!-- Standard order for creation (though less common in detail modal) -->
+              <div class="form-group">
+                <label>Name</label>
+                <input v-model="itemForm.name" ref="itemNameInput" type="text" required />
+              </div>
+              
+              <div class="form-group">
+                <label>Image</label>
+                <div style="text-align: center;">
+                  <input type="file" ref="fileInputRef" accept="image/*" capture="environment" @change="handleFileChange" style="display: none;" />
+                  <button type="button" class="btn-secondary" style="width: 100%; margin-bottom: 10px;" @click="triggerFileInput">
+                    <Camera :size="20" style="vertical-align: middle; margin-right: 8px;" />
+                    {{ preview ? 'Change Photo' : 'Take Picture' }}
+                  </button>
+                  <img v-if="preview" :src="preview" style="max-width: 100%; border-radius: 8px; margin-top: 10px;" />
+                  
+                  <div v-if="preview" style="margin-top: 12px; display: flex; flex-direction: column; align-items: center; gap: 10px;">
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                      <label class="switch-container">
+                        <input type="checkbox" v-model="isolateObject" @change="handleIsolateChange" :disabled="processingBackground" />
+                        <div class="switch-track">
+                          <div class="switch-thumb"></div>
+                        </div>
+                        <span class="silver-text" style="font-size: 14px;">Isolate Object</span>
+                      </label>
+                      <Loader2 v-if="processingBackground" class="animate-spin accent-purple" :size="18" />
+                    </div>
+                    <button type="button" class="btn-danger btn-small" @click="removeImage">Remove Image</button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="form-group" style="margin-top: 10px; border-top: 1px solid var(--border-color); padding-top: 15px;">
+                <label>Categories</label>
+                <div style="display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 10px;">
+                  <div v-for="cat in categories" :key="cat.id" 
+                      class="item-badge" 
+                      :style="{ cursor: 'pointer', backgroundColor: itemForm.categoryIds.includes(cat.id) ? (cat.color || 'var(--accent-purple)') : 'var(--input-bg)', color: itemForm.categoryIds.includes(cat.id) ? 'white' : 'var(--accent-silver)' }"
+                      @click="toggleCategory(cat.id)">
+                    {{ cat.name }}
+                  </div>
+                </div>
+              </div>
+
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                <div class="form-group">
+                  <label>Usage Frequency</label>
+                  <select v-model="itemForm.usageFrequency">
+                    <option v-for="opt in usageFrequencies" :key="opt" :value="opt">{{ opt }}</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>Attachment</label>
+                  <select v-model="itemForm.attachment">
+                    <option v-for="opt in attachments" :key="opt" :value="opt">{{ opt }}</option>
+                  </select>
+                </div>
+              </div>
+
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                <div class="form-group">
+                  <label>Intention</label>
+                  <select v-model="itemForm.intention">
+                    <option v-for="opt in intentions" :key="opt" :value="opt">{{ opt }}</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>Joy</label>
+                  <select v-model="itemForm.joy">
+                    <option v-for="opt in joys" :key="opt" :value="opt">{{ opt }}</option>
+                  </select>
+                </div>
+              </div>
+            </template>
 
             <div class="actions">
               <button type="submit" class="btn-primary" :disabled="saving">
@@ -571,7 +713,6 @@
 
         <!-- Transactions View -->
         <div v-else-if="modalView === 'transactions'">
-          <h2 class="accent-text">Adjust Quantity: {{ selectedItem?.name }}</h2>
           <p class="silver-text">Current Quantity: {{ selectedItem?.quantity }}</p>
           <form @submit.prevent="saveTransaction">
             <div class="form-group">
@@ -614,7 +755,6 @@
 
         <!-- Lend View -->
         <div v-else-if="modalView === 'lend'">
-          <h2 class="accent-text">Lend Item: {{ selectedItem?.name }}</h2>
           <form @submit.prevent="saveLoan">
             <div class="form-group">
               <label>Borrower Name</label>
@@ -640,8 +780,10 @@
     <!-- Camera Modal -->
     <div v-if="showCameraModal" class="modal-overlay" @click.self="closeCamera">
       <div class="modal-content" style="max-width: 600px; padding: 20px; text-align: center;">
-        <X class="modal-close" :size="20" @click="closeCamera" />
-        <h2 class="accent-text" style="margin-top: 0;">Capture Photo</h2>
+        <div class="modal-header">
+          <h2 class="accent-text" style="margin-top: 0;">Capture Photo</h2>
+          <X class="modal-close" :size="20" @click="closeCamera" />
+        </div>
         <div style="position: relative; width: 100%; aspect-ratio: 4/3; background: #000; border-radius: 12px; overflow: hidden; margin-bottom: 20px;">
           <video ref="videoRef" autoplay playsinline style="width: 100%; height: 100%; object-fit: cover;"></video>
           <canvas ref="canvasRef" style="display: none;"></canvas>
@@ -662,8 +804,7 @@
 import { ref, onMounted, onUnmounted, computed, nextTick, watch } from 'vue';
 import axios from 'axios';
 import { useAuthStore } from '../stores/auth';
-import CategoryFilter from './CategoryFilter.vue';
-import StatFilter from './StatFilter.vue';
+import FilterBar from './FilterBar.vue';
 import { useCategories } from '../composables/useCategories';
 import { useItems } from '../composables/useItems';
 import { formatStat, isDefined, getStatColor } from '../utils/formatters';
@@ -674,13 +815,14 @@ import {
   CheckCircle, X, Lock,
   Smile, Zap, Target, Heart, Loader2
 } from 'lucide-vue-next';
-import { removeBackground } from '@imgly/background-removal';
+import { preload } from '@imgly/background-removal';
+import { downscaleImage } from '../utils/imageProcessor';
+import BackgroundRemovalWorker from '../workers/background-removal.worker?worker';
 
 const authStore = useAuthStore();
 const { categories, fetchCategories, getCategoryName, getCategoryColor } = useCategories();
 const { 
-  items, loading, selectedCategoryIds, filterMode, searchQuery, 
-  selectedJoys, selectedFrequencies, selectedIntentions, selectedAttachments,
+  items, loading, selectedCategoryIds,
   fetchItems, filteredItems, totalIndividualItems
 } = useItems(categories);
 
@@ -699,6 +841,14 @@ const showDetailModal = ref(false);
 const modalView = ref('detail'); // 'detail', 'edit', 'transactions', 'lend'
 const showCameraModal = ref(false);
 
+const detailModalTitle = computed(() => {
+  if (modalView.value === 'detail') return selectedItem.value?.name;
+  if (modalView.value === 'edit') return editingItem.value ? 'Edit Item' : 'Add New Item';
+  if (modalView.value === 'transactions') return `Adjust Quantity: ${selectedItem.value?.name}`;
+  if (modalView.value === 'lend') return `Lend Item: ${selectedItem.value?.name}`;
+  return '';
+});
+
 const selectedItem = ref<any>(null);
 const editingItem = ref<any>(null);
 const editingCategory = ref<any>(null);
@@ -710,7 +860,7 @@ const itemForm = ref({
   usageFrequency: 'undefined',
   attachment: 'undefined',
   intention: 'undecided',
-  joy: 'medium',
+  joy: 'undefined',
   categoryIds: [] as string[]
 });
 
@@ -748,6 +898,57 @@ const processingBackground = ref(false);
 const originalFile = ref<File | null>(null);
 const originalPreview = ref<string | null>(null);
 
+const setPreview = (source: Blob | string | null) => {
+  if (preview.value && preview.value.startsWith('blob:')) {
+    URL.revokeObjectURL(preview.value);
+  }
+  if (!source) {
+    preview.value = null;
+    return;
+  }
+  if (typeof source === 'string') {
+    preview.value = source;
+  } else {
+    preview.value = URL.createObjectURL(source);
+  }
+};
+
+const setOriginalPreview = (source: Blob | string | null) => {
+  if (originalPreview.value && originalPreview.value.startsWith('blob:')) {
+    URL.revokeObjectURL(originalPreview.value);
+  }
+  if (!source) {
+    originalPreview.value = null;
+    return;
+  }
+  if (typeof source === 'string') {
+    originalPreview.value = source;
+  } else {
+    originalPreview.value = URL.createObjectURL(source);
+  }
+};
+
+let worker: Worker | null = null;
+
+const initWorker = () => {
+  if (!worker) {
+    worker = new BackgroundRemovalWorker();
+  }
+};
+
+const preloadBackgroundRemoval = () => {
+  preload({
+    publicPath: window.location.origin + '/background-removal-data/'
+  });
+};
+
+watch(() => authStore.editMode, (isEdit) => {
+  if (isEdit) {
+    preloadBackgroundRemoval();
+    initWorker();
+  }
+}, { immediate: true });
+
 watch([showItemModal, showCategoryModal, showTransactionModal, showLoanModal, showDetailModal, showCameraModal], (vals) => {
   if (vals.some(v => v)) {
     document.body.classList.add('modal-open');
@@ -755,12 +956,20 @@ watch([showItemModal, showCategoryModal, showTransactionModal, showLoanModal, sh
     nextTick(() => {
       if (document.querySelectorAll('.modal-overlay').length === 0) {
         document.body.classList.remove('modal-open');
+        setPreview(null);
+        setOriginalPreview(null);
       }
     });
   }
 });
 
 onUnmounted(() => {
+  setPreview(null);
+  setOriginalPreview(null);
+  if (worker) {
+    worker.terminate();
+    worker = null;
+  }
   nextTick(() => {
     if (document.querySelectorAll('.modal-overlay').length === 0) {
       document.body.classList.remove('modal-open');
@@ -844,10 +1053,8 @@ const openItemModal = (item: any = null, keepImage = false) => {
   if (!authStore.editMode) return;
   editingItem.value = item;
   if (!keepImage) {
-    preview.value = item?.image || null;
     file.value = null;
     originalFile.value = null;
-    originalPreview.value = item?.image || null;
     isolateObject.value = false;
   }
   
@@ -862,6 +1069,14 @@ const openItemModal = (item: any = null, keepImage = false) => {
       joy: item.joy,
       categoryIds: [...(item.categoryIds || [])]
     };
+    if (item.image) {
+      const imageUrl = `/api/uploads/${item.image}`;
+      setPreview(imageUrl);
+      setOriginalPreview(imageUrl);
+    } else {
+      setPreview(null);
+      setOriginalPreview(null);
+    }
   } else {
     itemForm.value = {
       name: '',
@@ -869,9 +1084,11 @@ const openItemModal = (item: any = null, keepImage = false) => {
       usageFrequency: 'undefined',
       attachment: 'undefined',
       intention: 'undecided',
-      joy: 'medium',
+      joy: 'undefined',
       categoryIds: []
     };
+    setPreview(null);
+    setOriginalPreview(null);
   }
   
   if (showDetailModal.value) {
@@ -892,15 +1109,12 @@ const handleFileChange = async (e: any) => {
   const selectedFile = e.target.files[0];
   if (selectedFile) {
     originalFile.value = selectedFile;
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      originalPreview.value = e.target?.result as string;
-      if (!isolateObject.value) {
-        preview.value = originalPreview.value;
-        file.value = selectedFile;
-      }
-    };
-    reader.readAsDataURL(selectedFile);
+    setOriginalPreview(selectedFile);
+    
+    if (!isolateObject.value) {
+      setPreview(selectedFile);
+      file.value = selectedFile;
+    }
 
     if (isolateObject.value) {
       await applyBackgroundRemoval(selectedFile);
@@ -917,26 +1131,45 @@ const handleIsolateChange = async () => {
     // Revert to original
     if (originalFile.value) {
       file.value = originalFile.value;
-      preview.value = originalPreview.value;
+      setPreview(originalFile.value);
     }
   }
 };
 
 const applyBackgroundRemoval = async (sourceFile: File) => {
   processingBackground.value = true;
+  initWorker();
   try {
-    const blob = await removeBackground(sourceFile, {
-      publicPath: window.location.origin + '/background-removal-data/'
+    const downscaled = await downscaleImage(sourceFile);
+    
+    return new Promise<void>((resolve, reject) => {
+      if (!worker) return reject(new Error('Worker not initialized'));
+      
+      const handleMessage = (e: MessageEvent) => {
+        worker?.removeEventListener('message', handleMessage);
+        if (e.data.error) {
+          reject(new Error(e.data.error));
+        } else {
+          const blob = e.data.blob;
+          const newFile = new File([blob], sourceFile.name.replace(/\.[^/.]+$/, "") + ".png", { type: 'image/png' });
+          file.value = newFile;
+          setPreview(blob);
+          resolve();
+        }
+      };
+      
+      worker.addEventListener('message', handleMessage);
+      worker.postMessage({
+        file: downscaled,
+        config: {
+          publicPath: window.location.origin + '/background-removal-data/'
+        }
+      });
     });
-    const newFile = new File([blob], sourceFile.name.replace(/\.[^/.]+$/, "") + ".png", { type: 'image/png' });
-    file.value = newFile;
-    const reader = new FileReader();
-    reader.onload = (e) => preview.value = e.target?.result as string;
-    reader.readAsDataURL(blob);
-  } catch (err) {
+  } catch (err: any) {
     console.error('Background removal failed', err);
     isolateObject.value = false;
-    alert('Failed to isolate object. Please try again or use a clearer photo.');
+    alert('Failed to isolate object: ' + (err.message || 'Please try again or use a clearer photo.'));
   } finally {
     processingBackground.value = false;
   }
@@ -944,9 +1177,9 @@ const applyBackgroundRemoval = async (sourceFile: File) => {
 
 const removeImage = () => {
   file.value = null;
-  preview.value = null;
+  setPreview(null);
   originalFile.value = null;
-  originalPreview.value = null;
+  setOriginalPreview(null);
   isolateObject.value = false;
 };
 
@@ -1015,12 +1248,12 @@ const capturePhoto = async () => {
       const capturedFile = new File([blob], 'captured_photo.jpg', { type: 'image/jpeg' });
 
       originalFile.value = capturedFile;
-      originalPreview.value = dataUrl;
+      setOriginalPreview(capturedFile);
 
       if (isolateObject.value) {
         await applyBackgroundRemoval(capturedFile);
       } else {
-        preview.value = dataUrl;
+        setPreview(capturedFile);
         file.value = capturedFile;
       }
       
@@ -1062,13 +1295,13 @@ const saveItem = async (stay = false) => {
         usageFrequency: 'undefined',
         attachment: 'undefined',
         intention: 'undecided',
-        joy: 'medium',
+        joy: 'undefined',
         categoryIds: []
       };
       file.value = null;
-      preview.value = null;
+      setPreview(null);
       originalFile.value = null;
-      originalPreview.value = null;
+      setOriginalPreview(null);
       isolateObject.value = false;
       nextTick(() => {
         itemNameInput.value?.focus();

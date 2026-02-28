@@ -122,10 +122,11 @@ input:focus, select:focus, textarea:focus {
 .card {
   background-color: var(--surface-color);
   border-radius: 12px;
-  padding: 24px;
+  padding: 16px;
   border: 1px solid var(--border-color);
-  margin-bottom: 20px;
+  margin-bottom: 16px;
   box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  position: relative;
 }
 
 .container {
@@ -141,7 +142,7 @@ input:focus, select:focus, textarea:focus {
 
 .tabs {
   display: flex;
-  margin-bottom: 20px;
+  margin-bottom: 16px;
   background-color: var(--input-bg);
   border-radius: 10px;
   padding: 4px;
@@ -166,10 +167,20 @@ input:focus, select:focus, textarea:focus {
   box-shadow: 0 1px 2px rgba(0,0,0,0.3);
 }
 
+.actions-row {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.actions-row .btn-primary {
+  width: auto;
+}
+
 .grid {
   display: grid;
   grid-template-columns: repeat(var(--grid-columns, 3), 1fr);
-  gap: 24px;
+  gap: 12px;
 }
 
 .item-card {
@@ -341,7 +352,7 @@ body.modal-open {
 .modal-content {
   position: relative;
   background-color: var(--surface-color);
-  padding: 32px;
+  padding: 24px;
   border-radius: 16px;
   width: 90%;
   max-width: 500px;
@@ -351,10 +362,19 @@ body.modal-open {
   box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04);
 }
 
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.modal-header h2 {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
 .modal-close {
-  position: absolute;
-  top: 16px;
-  right: 16px;
   cursor: pointer;
   color: var(--text-secondary);
   transition: color 0.15s;
@@ -543,7 +563,7 @@ body.modal-open {
   display: flex;
   gap: 10px;
   align-items: center;
-  margin-bottom: 20px;
+  margin-bottom: 16px;
   flex-wrap: wrap;
 }
 
@@ -600,29 +620,6 @@ body.modal-open {
   flex-wrap: wrap;
 }
 
-.selection-count {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  background-color: var(--input-bg);
-  border-radius: 8px;
-  border: 1px solid var(--border-color);
-  font-size: 0.9rem;
-  color: var(--text-secondary);
-  white-space: nowrap;
-  margin-left: auto;
-}
-
-.selection-count .count-value {
-  font-weight: 700;
-  color: var(--accent-purple);
-}
-
-.selection-count .count-label {
-  font-weight: 500;
-  opacity: 0.8;
-}
 
 /* Custom Multiselect */
 .multiselect-container {
@@ -768,10 +765,58 @@ body.modal-open {
     padding: 12px;
   }
   .filter-bar {
-    flex-direction: column;
+    flex-direction: row;
+    flex-wrap: wrap;
     align-items: stretch;
+    gap: 12px;
+  }
+  .filter-bar .btn-primary {
+    flex: 0 0 auto;
+    width: auto;
+  }
+  .search-wrapper {
+    flex: 1;
+    min-width: 150px;
+    width: auto;
   }
   .multiselect-container {
+    flex: 0 0 100% !important;
+    width: 100%;
     min-width: 0;
+  }
+  .stat-filters {
+    flex: 0 0 100% !important;
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+  }
+  .stat-filter-container {
+    width: 100%;
+  }
+  .stat-filter-input {
+    width: 100%;
+  }
+  .item-stats-row {
+    justify-content: space-between;
+    padding: 6px 12px;
+  }
+  .item-stat {
+    flex: 1;
+    justify-content: center;
+  }
+  .modal-overlay {
+    align-items: stretch;
+    justify-content: stretch;
+  }
+  .modal-content {
+    width: 100% !important;
+    height: 100% !important;
+    max-width: none !important;
+    max-height: none !important;
+    border-radius: 0 !important;
+    border: none !important;
+    padding: calc(20px + env(safe-area-inset-top, 0px)) 20px calc(20px + env(safe-area-inset-bottom, 0px)) 20px !important;
+    box-shadow: none !important;
   }
 }

@@ -26,6 +26,7 @@ export const useFilterStore = defineStore('filter', () => {
   const selectedIntentions = ref<string[]>(loadIds('filter:selectedIntentions'));
   const selectedAttachments = ref<string[]>(loadIds('filter:selectedAttachments'));
   const mode = ref<FilterMode>(loadMode());
+  const searchQuery = ref('');
 
   // Persist to localStorage whenever values change
   watch(
@@ -107,6 +108,7 @@ export const useFilterStore = defineStore('filter', () => {
     selectedIntentions,
     selectedAttachments,
     mode,
+    searchQuery,
     setSelectedCategoryIds,
     setMode,
     clear,

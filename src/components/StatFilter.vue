@@ -16,6 +16,7 @@
            class="dropdown-item" 
            :class="{ selected: selectedValues.includes(option) }"
            @click="toggleOption(option)">
+        <div class="stat-color-dot" :style="{ backgroundColor: getStatColor(option) }"></div>
         <span style="flex: 1;">{{ formatStat(option) }}</span>
         <Check v-if="selectedValues.includes(option)" :size="16" class="accent-text" />
       </div>
@@ -26,7 +27,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue';
 import { ChevronDown, Check } from 'lucide-vue-next';
-import { formatStat } from '../utils/formatters';
+import { formatStat, getStatColor } from '../utils/formatters';
 
 const props = defineProps<{
   selectedValues: string[];
@@ -145,6 +146,13 @@ onUnmounted(() => {
 
 .dropdown-item:hover {
   background: rgba(255,255,255,0.05);
+}
+
+.stat-color-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
 }
 
 .dropdown-item.selected {
