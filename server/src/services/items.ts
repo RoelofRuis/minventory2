@@ -188,7 +188,7 @@ export class ItemService {
             }
         }))).filter(item => item !== null);
         
-        return results;
+        return results.sort((a, b) => a.name.localeCompare(b.name));
     }
 
     async getItem(userId: string, encryptionKey: Buffer, itemId: string, showPrivate: boolean = false): Promise<any> {

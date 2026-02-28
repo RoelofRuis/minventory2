@@ -7,7 +7,7 @@ export function useCategories() {
   const fetchCategories = async () => {
     try {
       const res = await axios.get('/api/categories');
-      categories.value = res.data;
+      categories.value = res.data.sort((a: any, b: any) => a.name.localeCompare(b.name));
     } catch (err) {
       console.error('Failed to fetch categories', err);
     }

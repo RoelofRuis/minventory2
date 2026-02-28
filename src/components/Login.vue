@@ -47,9 +47,9 @@ const handleSubmit = async () => {
     await authStore.checkAuth();
     
     if (res.data.requires2FA) {
-      router.push('/verify-2fa');
+      router.push('/verify-2fa').catch(() => {});
     } else {
-      router.push('/');
+      router.push('/').catch(() => {});
     }
   } catch (err: any) {
     error.value = err.response?.data?.error || 'An error occurred';

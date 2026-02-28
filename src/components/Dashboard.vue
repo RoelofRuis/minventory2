@@ -996,12 +996,13 @@ const visibleCategories = computed(() => {
 
 const filteredCategories = computed(() => {
   const q = categorySearch.value.trim().toLowerCase();
-  const base = visibleCategories.value as any[];
-  if (!q) return base;
-  return base.filter(c =>
+  const base = [...visibleCategories.value] as any[];
+  const results = q ? base.filter(c =>
     c.name.toLowerCase().includes(q) ||
     (c.description || '').toLowerCase().includes(q)
-  );
+  ) : base;
+
+  return results.sort((a, b) => a.name.localeCompare(b.name));
 });
 
 const sortedCategories = computed(() => {
@@ -1070,9 +1071,8 @@ const openItemModal = (item: any = null, keepImage = false) => {
       categoryIds: [...(item.categoryIds || [])]
     };
     if (item.image) {
-      const imageUrl = `/api/uploads/${item.image}`;
-      setPreview(imageUrl);
-      setOriginalPreview(imageUrl);
+      setPreview(item.image);
+      setOriginalPreview(item.image);
     } else {
       setPreview(null);
       setOriginalPreview(null);

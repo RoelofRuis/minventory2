@@ -48,7 +48,7 @@ const verifyToken = async () => {
   try {
     await axios.post('/api/auth/verify-2fa', { token: token.value });
     await authStore.checkAuth();
-    router.push('/');
+    router.push('/').catch(() => {});
   } catch (err: any) {
     error.value = 'Invalid code. Try again.';
   } finally {

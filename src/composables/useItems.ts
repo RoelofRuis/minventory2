@@ -141,7 +141,7 @@ export function useItems(categories: any) {
       result = result.filter(i => selectedAttachments.value.includes(i.attachment || 'undefined'));
     }
     
-    return result;
+    return [...result].sort((a, b) => a.name.localeCompare(b.name));
   });
 
   const totalIndividualItems = computed(() => {

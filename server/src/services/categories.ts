@@ -91,9 +91,9 @@ export class CategoryService {
         }));
 
         if (!showPrivate) {
-            return categoriesWithCounts.filter(category => !category.isPrivate);
+            return categoriesWithCounts.filter(category => !category.isPrivate).sort((a, b) => a.name.localeCompare(b.name));
         }
-        return categoriesWithCounts;
+        return categoriesWithCounts.sort((a, b) => a.name.localeCompare(b.name));
     }
 
     async getDescendantIds(userId: string, parentId: string): Promise<string[]> {
