@@ -103,6 +103,10 @@ watch(filteredItems, () => {
   updateSpriteOpacities();
 }, { deep: true });
 
+watch(items, () => {
+  rebuildCloud();
+});
+
 watch(() => authStore.showPrivate, async (val) => {
   if (val) {
     loading.value = true;
@@ -468,6 +472,12 @@ const onWindowResize = () => {
 };
 
 const rebuildCloud = () => {
+  // Clear object URL cache
+  imageUrlCache.forEach(url => {
+    try { URL.revokeObjectURL(url); } catch {}
+  });
+  imageUrlCache.clear();
+
   // Properly dispose and clear existing sprites and materials
   const materials = new Set<THREE.SpriteMaterial>();
   const textures = new Set<THREE.Texture>();

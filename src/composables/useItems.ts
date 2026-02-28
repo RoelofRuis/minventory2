@@ -23,6 +23,13 @@ export function useItems(categories: any) {
   const fetchItems = async () => {
     loading.value = true;
     try {
+      // Clear old object URLs to avoid memory leaks
+      items.value.forEach((item: any) => {
+        if (item.image && typeof item.image === 'string' && item.image.startsWith('blob:')) {
+          try { URL.revokeObjectURL(item.image); } catch (e) {}
+        }
+      });
+
       const res = await axios.get('/api/items');
       items.value = res.data;
 

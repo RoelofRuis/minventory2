@@ -27,6 +27,8 @@ export interface Item {
     intention: Intention;
     joy: Joy;
     isIsolated?: boolean;
+    isBorrowed?: boolean;
+    borrowedFrom?: Buffer; // Encrypted Buffer
 }
 
 export interface Category {

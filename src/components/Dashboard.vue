@@ -40,6 +40,7 @@
               </div>
               <h3 class="item-title-overlay">
                 <Lock v-if="item.private" :size="12" color="#f59e0b" style="margin-right: 4px; vertical-align: middle;" title="Private" />
+                <Users v-if="item.isBorrowed" :size="12" color="#f59e0b" style="margin-right: 4px; vertical-align: middle;" title="Borrowed" />
                 {{ item.name }}
               </h3>
             </div>
@@ -316,6 +317,20 @@
             </div>
           </template>
 
+          <div class="form-group" style="margin-top: 10px; border-top: 1px solid var(--border-color); padding-top: 15px; display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
+            <label class="switch-container" style="margin-bottom: 0;">
+              <input type="checkbox" v-model="itemForm.isBorrowed" />
+              <div class="switch-track">
+                <div class="switch-thumb"></div>
+              </div>
+              <span class="silver-text" style="font-size: 14px;">Borrowed</span>
+            </label>
+            <div v-if="itemForm.isBorrowed" style="flex: 1; min-width: 150px; display: flex; align-items: center; gap: 10px;">
+              <span class="silver-text" style="font-size: 14px;">From:</span>
+              <input v-model="itemForm.borrowedFrom" type="text" placeholder="Whom?" style="margin: 0;" />
+            </div>
+          </div>
+
           <div class="actions">
             <button type="submit" class="btn-primary" :disabled="saving" style="flex: 1; width: auto;">{{ saving ? 'Saving...' : 'Save' }}</button>
             <button v-if="!editingItem" type="button" class="btn-secondary" :disabled="saving" @click="saveItem(true)" style="flex: 1;">
@@ -524,6 +539,13 @@
                 {{ formatStat(selectedItem?.attachment) }}
               </div>
             </div>
+            <div v-if="selectedItem?.isBorrowed" class="stat-card" style="border-color: #f59e0b;">
+              <div class="stat-label">Borrowed From</div>
+              <div class="stat-value" style="display: flex; align-items: center; justify-content: center; gap: 6px; color: #f59e0b;">
+                <Users :size="16" />
+                {{ selectedItem?.borrowedFrom || 'Someone' }}
+              </div>
+            </div>
           </div>
 
           <div v-if="selectedItem?.categoryIds && selectedItem.categoryIds.length > 0" style="margin-top: 20px;">
@@ -702,6 +724,20 @@
               </div>
             </template>
 
+            <div class="form-group" style="margin-top: 10px; border-top: 1px solid var(--border-color); padding-top: 15px; display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
+              <label class="switch-container" style="margin-bottom: 0;">
+                <input type="checkbox" v-model="itemForm.isBorrowed" />
+                <div class="switch-track">
+                  <div class="switch-thumb"></div>
+                </div>
+                <span class="silver-text" style="font-size: 14px;">Borrowed</span>
+              </label>
+              <div v-if="itemForm.isBorrowed" style="flex: 1; min-width: 150px; display: flex; align-items: center; gap: 10px;">
+                <span class="silver-text" style="font-size: 14px;">From:</span>
+                <input v-model="itemForm.borrowedFrom" type="text" placeholder="Whom?" style="margin: 0;" />
+              </div>
+            </div>
+
             <div class="actions">
               <button type="submit" class="btn-primary" :disabled="saving">
                 <Loader2 v-if="saving" class="animate-spin" :size="18" style="vertical-align: middle; margin-right: 8px;" />
@@ -861,7 +897,9 @@ const itemForm = ref({
   attachment: 'undefined',
   intention: 'undecided',
   joy: 'undefined',
-  categoryIds: [] as string[]
+  categoryIds: [] as string[],
+  isBorrowed: false,
+  borrowedFrom: ''
 });
 
 const categoryForm = ref({
@@ -1068,7 +1106,9 @@ const openItemModal = (item: any = null, keepImage = false) => {
       attachment: item.attachment,
       intention: item.intention,
       joy: item.joy,
-      categoryIds: [...(item.categoryIds || [])]
+      categoryIds: [...(item.categoryIds || [])],
+      isBorrowed: item.isBorrowed || false,
+      borrowedFrom: item.borrowedFrom || ''
     };
     if (item.image) {
       setPreview(item.image);
@@ -1085,7 +1125,9 @@ const openItemModal = (item: any = null, keepImage = false) => {
       attachment: 'undefined',
       intention: 'undecided',
       joy: 'undefined',
-      categoryIds: []
+      categoryIds: [],
+      isBorrowed: false,
+      borrowedFrom: ''
     };
     setPreview(null);
     setOriginalPreview(null);
@@ -1098,7 +1140,9 @@ const openItemModal = (item: any = null, keepImage = false) => {
   }
   
   nextTick(() => {
-    itemNameInput.value?.focus();
+    if (!item) {
+      itemNameInput.value?.focus();
+    }
   });
 };
 
@@ -1296,7 +1340,9 @@ const saveItem = async (stay = false) => {
         attachment: 'undefined',
         intention: 'undecided',
         joy: 'undefined',
-        categoryIds: []
+        categoryIds: [],
+        isBorrowed: false,
+        borrowedFrom: ''
       };
       file.value = null;
       setPreview(null);

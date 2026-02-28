@@ -62,7 +62,9 @@ export class ItemService {
             attachment: itemData.attachment || Attachment.Undefined,
             intention: itemData.intention || Intention.Undecided,
             joy: itemData.joy || Joy.Medium,
-            isIsolated: itemData.isIsolated === 'true' || itemData.isIsolated === true
+            isIsolated: itemData.isIsolated === 'true' || itemData.isIsolated === true,
+            isBorrowed: itemData.isBorrowed === 'true' || itemData.isBorrowed === true,
+            borrowedFrom: itemData.borrowedFrom ? encrypt(itemData.borrowedFrom, encryptionKey) : undefined
         };
 
         await this.itemRepository.create(item);
@@ -124,6 +126,12 @@ export class ItemService {
         if (itemData.isIsolated !== undefined) {
             existingItem.isIsolated = itemData.isIsolated === 'true' || itemData.isIsolated === true;
         }
+        if (itemData.isBorrowed !== undefined) {
+            existingItem.isBorrowed = itemData.isBorrowed === 'true' || itemData.isBorrowed === true;
+        }
+        if (itemData.borrowedFrom !== undefined) {
+            existingItem.borrowedFrom = itemData.borrowedFrom ? encrypt(itemData.borrowedFrom, encryptionKey) : undefined;
+        }
 
         await this.itemRepository.update(existingItem);
 
@@ -163,6 +171,7 @@ export class ItemService {
 
                 let nameBuffer = Buffer.isBuffer(item.name) ? item.name : Buffer.from(item.name, 'base64');
                 let decryptedName: string;
+                let decryptedBorrowedFrom: string | undefined;
                 
                 try {
                     decryptedName = decrypt(nameBuffer, encryptionKey).toString();
@@ -172,12 +181,22 @@ export class ItemService {
                     decryptedName = decrypt(decodedBuffer, encryptionKey).toString();
                 }
 
+                if (item.borrowedFrom) {
+                    try {
+                        decryptedBorrowedFrom = decrypt(item.borrowedFrom, encryptionKey).toString();
+                    } catch (err) {
+                        decryptedBorrowedFrom = '[Decryption Failed]';
+                    }
+                }
+
+                const updatedAtTs = item.updatedAt ? new Date(item.updatedAt).getTime() : Date.now();
                 return {
                     ...item,
                     name: decryptedName,
+                    borrowedFrom: decryptedBorrowedFrom,
                     image: null,
-                    imageUrl: item.imageBlob ? `/api/items/${item.id}/image` : null,
-                    thumbUrl: item.thumbnailBlob ? `/api/items/${item.id}/thumb` : null,
+                    imageUrl: item.imageBlob ? `/api/items/${item.id}/image?v=${updatedAtTs}` : null,
+                    thumbUrl: item.thumbnailBlob ? `/api/items/${item.id}/thumb?v=${updatedAtTs}` : null,
                     imageBlob: undefined,
                     thumbnailBlob: undefined,
                     categoryIds: itemCategoryIds,
@@ -196,16 +215,8 @@ export class ItemService {
         if (!item) throw new Error('Item not found');
 
         const allCategories = await this.categoryRepository.findByUserId(userId);
-        const privateCategoryIds = new Set<string>();
-
-        for (const cat of allCategories) {
-            if (isPrivateRecursive(cat.id, allCategories)) {
-                privateCategoryIds.add(cat.id);
-            }
-        }
-
         const itemCategoryIds = await this.itemRepository.getItemCategories(item.id);
-        const isPrivate = itemCategoryIds.some(id => privateCategoryIds.has(id));
+        const isPrivate = itemCategoryIds.some(id => isPrivateRecursive(id, allCategories));
 
         if (isPrivate && !showPrivate) {
             throw new Error('Access denied: Item is private');
@@ -213,6 +224,7 @@ export class ItemService {
 
         let nameBuffer = Buffer.isBuffer(item.name) ? item.name : Buffer.from(item.name, 'base64');
         let decryptedName: string;
+        let decryptedBorrowedFrom: string | undefined;
         
         try {
             decryptedName = decrypt(nameBuffer, encryptionKey).toString();
@@ -222,21 +234,30 @@ export class ItemService {
             decryptedName = decrypt(decodedBuffer, encryptionKey).toString();
         }
 
+        if (item.borrowedFrom) {
+            try {
+                decryptedBorrowedFrom = decrypt(item.borrowedFrom, encryptionKey).toString();
+            } catch (err) {
+                decryptedBorrowedFrom = '[Decryption Failed]';
+            }
+        }
+
         let decryptedImage = '';
         if (item.imageBlob) {
             decryptedImage = decrypt(item.imageBlob, encryptionKey).toString('base64');
         }
         
-        const categoryIds = await this.itemRepository.getItemCategories(item.id);
         const transactions = await this.transactionRepository.findByItemId(item.id);
         const loans = await this.loanRepository.findByItemId(item.id);
 
+        const updatedAtTs = item.updatedAt ? new Date(item.updatedAt).getTime() : Date.now();
         return {
             ...item,
             name: decryptedName,
+            borrowedFrom: decryptedBorrowedFrom,
             image: decryptedImage ? `data:image/jpeg;base64,${decryptedImage}` : null,
-            imageUrl: item.imageBlob ? `/api/items/${item.id}/image` : null,
-            thumbUrl: item.thumbnailBlob ? `/api/items/${item.id}/thumb` : null,
+            imageUrl: item.imageBlob ? `/api/items/${item.id}/image?v=${updatedAtTs}` : null,
+            thumbUrl: item.thumbnailBlob ? `/api/items/${item.id}/thumb?v=${updatedAtTs}` : null,
             imageBlob: undefined,
             thumbnailBlob: undefined,
             categoryIds: itemCategoryIds,
