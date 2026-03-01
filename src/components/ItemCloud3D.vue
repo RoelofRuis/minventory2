@@ -70,8 +70,12 @@ const authStore = useAuthStore();
 const { categories, fetchCategories, getCategoryName, getCategoryColor } = useCategories();
 const visibleCategories = computed(() => authStore.showPrivate ? categories.value : categories.value.filter(c => !c.private));
 const { 
-  items, loading, 
-  fetchItems, fetchObjectUrl, filteredItems, totalIndividualItems
+  items,
+  loading,
+  filteredItems,
+  totalIndividualItems,
+  fetchItems,
+  fetchObjectUrl,
 } = useItems();
 
 const container = ref<HTMLElement | null>(null);
