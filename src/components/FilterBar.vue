@@ -1,3 +1,27 @@
+<script setup lang="ts">
+import { Smile, Zap, Target, Heart, X } from 'lucide-vue-next';
+import CategoryFilter from './CategoryFilter.vue';
+import StatFilter from './StatFilter.vue';
+import { usageFrequencies, attachments, intentions, joys } from '../utils/constants';
+import {useFilters} from "../composables/useFilters.ts";
+
+defineProps<{
+  categories: any[];
+  totalItems: number;
+}>();
+
+const {
+  selectedCategoryIds,
+  mode: filterMode,
+  selectedJoys,
+  selectedFrequencies,
+  selectedIntentions,
+  selectedAttachments,
+  searchQuery
+} = useFilters();
+</script>
+
+
 <template>
   <div class="card filter-bar-card">
     <div class="quantity-badge total-count-badge" :title="`${totalItems} total ${totalItems === 1 ? 'item' : 'items'}`">
@@ -47,31 +71,6 @@
     </div>
   </div>
 </template>
-
-<script setup lang="ts">
-import { storeToRefs } from 'pinia';
-import { useFilterStore } from '../stores/filter';
-import { Smile, Zap, Target, Heart, X } from 'lucide-vue-next';
-import CategoryFilter from './CategoryFilter.vue';
-import StatFilter from './StatFilter.vue';
-import { usageFrequencies, attachments, intentions, joys } from '../utils/constants';
-
-defineProps<{
-  categories: any[];
-  totalItems: number;
-}>();
-
-const filterStore = useFilterStore();
-const { 
-  selectedCategoryIds, 
-  mode: filterMode, 
-  selectedJoys, 
-  selectedFrequencies, 
-  selectedIntentions, 
-  selectedAttachments,
-  searchQuery
-} = storeToRefs(filterStore);
-</script>
 
 <style scoped>
 .filter-bar-card {

@@ -1,10 +1,9 @@
 import { storeToRefs } from 'pinia';
 import { useItemStore } from '../stores/item';
-import { useFilterStore } from '../stores/filter';
+import {useFilters} from "./useFilters.ts";
 
 export function useItems() {
   const store = useItemStore();
-  const filterStore = useFilterStore();
   
   const { items, loading, filteredItems, totalIndividualItems } = storeToRefs(store);
   const { 
@@ -15,7 +14,7 @@ export function useItems() {
     selectedIntentions, 
     selectedAttachments,
     searchQuery
-  } = storeToRefs(filterStore);
+  } = useFilters();
 
   return {
     items,

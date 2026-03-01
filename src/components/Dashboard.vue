@@ -1,3 +1,743 @@
+<script setup lang="ts">
+import { ref, onMounted, onUnmounted, computed, nextTick, watch } from 'vue';
+import axios from 'axios';
+import { useAuthStore } from '../stores/auth';
+import FilterBar from './FilterBar.vue';
+import { useCategories } from '../composables/useCategories';
+import { useItems } from '../composables/useItems';
+import { formatStat, isDefined, getStatColor } from '../utils/formatters';
+import { usageFrequencies, attachments, intentions, joys } from '../utils/constants';
+import {
+  Plus, Edit2, Trash2, Camera,
+  ArrowRightLeft, Package, Tag, Users, ArrowLeft,
+  CheckCircle, X, Lock, Gift,
+  Smile, Zap, Target, Heart, Loader2
+} from 'lucide-vue-next';
+import { preload } from '@imgly/background-removal';
+import { downscaleImage } from '../utils/imageProcessor';
+import BackgroundRemovalWorker from '../workers/background-removal.worker?worker';
+
+const authStore = useAuthStore();
+const { categories, visibleCategories, fetchCategories, getCategoryName, getCategoryColor } = useCategories();
+const {
+  items, loading, selectedCategoryIds,
+  fetchItems, filteredItems, totalIndividualItems
+} = useItems();
+
+const saving = ref(false);
+
+const currentTab = ref('items');
+const loans = ref<any[]>([]);
+const categorySearch = ref('');
+
+// Modals state
+const showItemModal = ref(false);
+const showCategoryModal = ref(false);
+const showTransactionModal = ref(false);
+const showLoanModal = ref(false);
+const showDetailModal = ref(false);
+const modalView = ref('detail'); // 'detail', 'edit', 'transactions', 'lend'
+const showCameraModal = ref(false);
+
+const detailModalTitle = computed(() => {
+  if (modalView.value === 'detail') return selectedItem.value?.name;
+  if (modalView.value === 'edit') return editingItem.value ? 'Edit Item' : 'Add New Item';
+  if (modalView.value === 'transactions') return `Adjust Quantity: ${selectedItem.value?.name}`;
+  if (modalView.value === 'lend') return `Lend Item: ${selectedItem.value?.name}`;
+  return '';
+});
+
+const selectedItem = ref<any>(null);
+const editingItem = ref<any>(null);
+const editingCategory = ref<any>(null);
+
+// Forms
+const itemForm = ref({
+  name: '',
+  quantity: 0,
+  usageFrequency: 'undefined',
+  attachment: 'undefined',
+  intention: 'undecided',
+  joy: 'undefined',
+  categoryIds: [] as string[],
+  isBorrowed: false,
+  borrowedFrom: '',
+  isGifted: false,
+  giftedBy: ''
+});
+
+const categoryForm = ref({
+  name: '',
+  description: '',
+  color: '#9d50bb',
+  intentionalCount: null as number | null,
+  parentId: null as string | null,
+  private: false
+});
+
+const transactionForm = ref({
+  delta: 0,
+  note: '',
+  reason: undefined as string | undefined
+});
+
+const loanForm = ref({
+  borrower: '',
+  quantity: 1,
+  note: ''
+});
+
+const fileInputRef = ref<HTMLInputElement | null>(null);
+const videoRef = ref<HTMLVideoElement | null>(null);
+const canvasRef = ref<HTMLCanvasElement | null>(null);
+const itemNameInput = ref<HTMLInputElement | null>(null);
+const file = ref<File | null>(null);
+const preview = ref<string | null>(null);
+const stream = ref<MediaStream | null>(null);
+
+const isolateObject = ref(false);
+const processingBackground = ref(false);
+const originalFile = ref<File | null>(null);
+const originalPreview = ref<string | null>(null);
+
+const setPreview = (source: Blob | string | null) => {
+  if (preview.value && preview.value.startsWith('blob:')) {
+    URL.revokeObjectURL(preview.value);
+  }
+  if (!source) {
+    preview.value = null;
+    return;
+  }
+  if (typeof source === 'string') {
+    preview.value = source;
+  } else {
+    preview.value = URL.createObjectURL(source);
+  }
+};
+
+const setOriginalPreview = (source: Blob | string | null) => {
+  if (originalPreview.value && originalPreview.value.startsWith('blob:')) {
+    URL.revokeObjectURL(originalPreview.value);
+  }
+  if (!source) {
+    originalPreview.value = null;
+    return;
+  }
+  if (typeof source === 'string') {
+    originalPreview.value = source;
+  } else {
+    originalPreview.value = URL.createObjectURL(source);
+  }
+};
+
+let worker: Worker | null = null;
+
+const initWorker = () => {
+  if (!worker) {
+    worker = new BackgroundRemovalWorker();
+  }
+};
+
+const preloadBackgroundRemoval = () => {
+  preload({
+    publicPath: window.location.origin + '/background-removal-data/'
+  });
+};
+
+watch(() => authStore.editMode, (isEdit) => {
+  if (isEdit) {
+    preloadBackgroundRemoval();
+    initWorker();
+  }
+}, { immediate: true });
+
+watch([showItemModal, showCategoryModal, showTransactionModal, showLoanModal, showDetailModal, showCameraModal], (vals) => {
+  if (vals.some(v => v)) {
+    document.body.classList.add('modal-open');
+  } else {
+    nextTick(() => {
+      if (document.querySelectorAll('.modal-overlay').length === 0) {
+        document.body.classList.remove('modal-open');
+        setPreview(null);
+        setOriginalPreview(null);
+      }
+    });
+  }
+});
+
+onUnmounted(() => {
+  setPreview(null);
+  setOriginalPreview(null);
+  if (worker) {
+    worker.terminate();
+    worker = null;
+  }
+  nextTick(() => {
+    if (document.querySelectorAll('.modal-overlay').length === 0) {
+      document.body.classList.remove('modal-open');
+    }
+  });
+});
+
+// Computed
+const closeMatches = computed(() => {
+  const name = itemForm.value.name.trim().toLowerCase();
+  if (name.length < 2) return [];
+
+  return items.value
+      .filter(item => {
+        if (editingItem.value && item.id === editingItem.value.id) return false;
+        return item.name.toLowerCase().includes(name);
+      })
+      .slice(0, 5);
+});
+
+const filteredCategories = computed(() => {
+  const q = categorySearch.value.trim().toLowerCase();
+  const base = [...visibleCategories.value] as any[];
+  const results = q ? base.filter(c =>
+      c.name.toLowerCase().includes(q) ||
+      (c.description || '').toLowerCase().includes(q)
+  ) : base;
+
+  return results.sort((a, b) => a.name.localeCompare(b.name));
+});
+
+const sortedCategories = computed(() => {
+  let cats = categories.value;
+  if (!authStore.showPrivate) {
+    cats = cats.filter(c => !c.private);
+  }
+
+  const result: any[] = [];
+  const addChildren = (parentId: string | null, level: number) => {
+    const children = cats
+        .filter(c => (c.parentId || null) === parentId)
+        .sort((a, b) => a.name.localeCompare(b.name));
+
+    for (const child of children) {
+      result.push({ ...child, level });
+      addChildren(child.id, level + 1);
+    }
+  };
+  addChildren(null, 0);
+
+  // Add any categories that might have been missed (e.g. circular dependency or missing parent)
+  const addedIds = new Set(result.map(c => c.id));
+  const missed = cats.filter(c => !addedIds.has(c.id));
+  for (const cat of missed) {
+    result.push({ ...cat, level: 0 });
+  }
+
+  return result;
+});
+
+watch(() => authStore.showPrivate, () => {
+  fetchData(true);
+});
+
+// Fetching
+const fetchData = async (force = false) => {
+  const [_, __, loansRes] = await Promise.all([
+    fetchCategories(force),
+    fetchItems(force),
+    axios.get('/api/loans')
+  ]);
+
+  loans.value = (loansRes as any).data;
+};
+
+// Item Actions
+const openItemModal = (item: any = null, keepImage = false) => {
+  if (!authStore.editMode) return;
+  editingItem.value = item;
+  if (!keepImage) {
+    file.value = null;
+    originalFile.value = null;
+    isolateObject.value = false;
+  }
+
+  if (item) {
+    isolateObject.value = item.isIsolated || false;
+    itemForm.value = {
+      name: item.name,
+      quantity: item.quantity,
+      usageFrequency: item.usageFrequency,
+      attachment: item.attachment,
+      intention: item.intention,
+      joy: item.joy,
+      categoryIds: [...(item.categoryIds || [])],
+      isBorrowed: item.isBorrowed || false,
+      borrowedFrom: item.borrowedFrom || '',
+      isGifted: item.isGifted || false,
+      giftedBy: item.giftedBy || ''
+    };
+    if (item.image) {
+      setPreview(item.image);
+      setOriginalPreview(item.image);
+    } else {
+      setPreview(null);
+      setOriginalPreview(null);
+    }
+  } else {
+    itemForm.value = {
+      name: '',
+      quantity: 1,
+      usageFrequency: 'undefined',
+      attachment: 'undefined',
+      intention: 'undecided',
+      joy: 'undefined',
+      categoryIds: [],
+      isBorrowed: false,
+      borrowedFrom: '',
+      isGifted: false,
+      giftedBy: ''
+    };
+    setPreview(null);
+    setOriginalPreview(null);
+  }
+
+  if (showDetailModal.value) {
+    modalView.value = 'edit';
+  } else {
+    showItemModal.value = true;
+  }
+
+  nextTick(() => {
+    if (!item) {
+      itemNameInput.value?.focus();
+    }
+  });
+};
+
+
+const triggerFileInput = () => startCamera();
+
+const handleFileChange = async (e: any) => {
+  const selectedFile = e.target.files[0];
+  if (selectedFile) {
+    originalFile.value = selectedFile;
+    setOriginalPreview(selectedFile);
+
+    if (!isolateObject.value) {
+      setPreview(selectedFile);
+      file.value = selectedFile;
+    }
+
+    if (isolateObject.value) {
+      await applyBackgroundRemoval(selectedFile);
+    }
+  }
+};
+
+const handleIsolateChange = async () => {
+  if (isolateObject.value) {
+    if (originalFile.value) {
+      await applyBackgroundRemoval(originalFile.value);
+    }
+  } else {
+    // Revert to original
+    if (originalFile.value) {
+      file.value = originalFile.value;
+      setPreview(originalFile.value);
+    }
+  }
+};
+
+const applyBackgroundRemoval = async (sourceFile: File) => {
+  processingBackground.value = true;
+  initWorker();
+  try {
+    const downscaled = await downscaleImage(sourceFile);
+
+    return new Promise<void>((resolve, reject) => {
+      if (!worker) return reject(new Error('Worker not initialized'));
+
+      const handleMessage = (e: MessageEvent) => {
+        worker?.removeEventListener('message', handleMessage);
+        if (e.data.error) {
+          reject(new Error(e.data.error));
+        } else {
+          const blob = e.data.blob;
+          const newFile = new File([blob], sourceFile.name.replace(/\.[^/.]+$/, "") + ".png", { type: 'image/png' });
+          file.value = newFile;
+          setPreview(blob);
+          resolve();
+        }
+      };
+
+      worker.addEventListener('message', handleMessage);
+      worker.postMessage({
+        file: downscaled,
+        config: {
+          publicPath: window.location.origin + '/background-removal-data/'
+        }
+      });
+    });
+  } catch (err: any) {
+    console.error('Background removal failed', err);
+    isolateObject.value = false;
+    alert('Failed to isolate object: ' + (err.message || 'Please try again or use a clearer photo.'));
+  } finally {
+    processingBackground.value = false;
+  }
+};
+
+const removeImage = () => {
+  file.value = null;
+  setPreview(null);
+  originalFile.value = null;
+  setOriginalPreview(null);
+  isolateObject.value = false;
+};
+
+const startCamera = async () => {
+  try {
+    // Check if getUserMedia is supported
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      throw new Error('Camera not supported');
+    }
+
+    showCameraModal.value = true;
+    await nextTick();
+
+    stream.value = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment' },
+      audio: false
+    });
+
+    if (videoRef.value) {
+      videoRef.value.srcObject = stream.value;
+    }
+  } catch (err) {
+    console.error('Failed to start camera', err);
+    showCameraModal.value = false;
+    // Fallback to file input
+    fileInputRef.value?.click();
+  }
+};
+
+const stopCamera = () => {
+  if (stream.value) {
+    stream.value.getTracks().forEach(track => track.stop());
+    stream.value = null;
+  }
+};
+
+const closeCamera = () => {
+  stopCamera();
+  showCameraModal.value = false;
+};
+
+const capturePhoto = async () => {
+  if (videoRef.value && canvasRef.value) {
+    const video = videoRef.value;
+    const canvas = canvasRef.value;
+
+    // Use video dimensions
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+
+      // Convert to blob and file
+      const parts = dataUrl.split(',');
+      const byteString = atob(parts[1] || '');
+      const mimeString = (parts[0] || '').split(':')[1]?.split(';')[0] || 'image/jpeg';
+      const ab = new ArrayBuffer(byteString.length);
+      const ia = new Uint8Array(ab);
+      for (let i = 0; i < byteString.length; i++) {
+        ia[i] = byteString.charCodeAt(i);
+      }
+      const blob = new Blob([ab], { type: mimeString });
+      const capturedFile = new File([blob], 'captured_photo.jpg', { type: 'image/jpeg' });
+
+      originalFile.value = capturedFile;
+      setOriginalPreview(capturedFile);
+
+      if (isolateObject.value) {
+        await applyBackgroundRemoval(capturedFile);
+      } else {
+        setPreview(capturedFile);
+        file.value = capturedFile;
+      }
+
+      closeCamera();
+    }
+  }
+};
+
+const toggleCategory = (catId: string) => {
+  const idx = itemForm.value.categoryIds.indexOf(catId);
+  if (idx > -1) itemForm.value.categoryIds.splice(idx, 1);
+  else itemForm.value.categoryIds.push(catId);
+};
+
+const saveItem = async (stay = false) => {
+  if (!authStore.editMode) return;
+  saving.value = true;
+  try {
+    const formData = new FormData();
+    formData.append('isIsolated', isolateObject.value.toString());
+    Object.entries(itemForm.value).forEach(([key, val]) => {
+      if (key === 'categoryIds') formData.append(key, JSON.stringify(val));
+      else formData.append(key, val as any);
+    });
+
+    if (file.value) formData.append('image', file.value);
+    else if (!preview.value && editingItem.value?.image) formData.append('removeImage', 'true');
+
+    if (editingItem.value) {
+      await axios.put(`/api/items/${editingItem.value.id}`, formData);
+    } else {
+      await axios.post('/api/items', formData);
+    }
+
+    if (stay) {
+      itemForm.value = {
+        name: '',
+        quantity: 1,
+        usageFrequency: 'undefined',
+        attachment: 'undefined',
+        intention: 'undecided',
+        joy: 'undefined',
+        categoryIds: [],
+        isBorrowed: false,
+        borrowedFrom: '',
+        isGifted: false,
+        giftedBy: ''
+      };
+      file.value = null;
+      setPreview(null);
+      originalFile.value = null;
+      setOriginalPreview(null);
+      isolateObject.value = false;
+      nextTick(() => {
+        itemNameInput.value?.focus();
+      });
+    } else {
+      showItemModal.value = false;
+      if (showDetailModal.value) {
+        modalView.value = 'detail';
+        // Refresh selectedItem after save
+        if (editingItem.value) {
+          const res = await axios.get(`/api/items/${editingItem.value.id}`);
+          selectedItem.value = res.data;
+        }
+      }
+    }
+    await fetchData(true);
+  } catch (err) {
+    alert('Failed to save item');
+  } finally {
+    saving.value = false;
+  }
+};
+
+// TODO: deprecated
+const viewItemDetails = async (item: any) => {
+  try {
+    const res = await axios.get(`/api/items/${item.id}`);
+    selectedItem.value = res.data;
+    if (authStore.editMode) {
+      openItemModal(res.data);
+    } else {
+      modalView.value = 'detail';
+      showDetailModal.value = true;
+    }
+  } catch (err) {
+    console.error(err);
+  }
+};
+
+const confirmDeleteItem = async (id: string) => {
+  if (!authStore.editMode) return;
+  if (confirm('Are you sure you want to delete this item?')) {
+    try {
+      await axios.delete(`/api/items/${id}`);
+      await fetchData(true);
+    } catch (err) {
+      alert('Failed to delete item');
+    }
+  }
+};
+
+// Category Actions
+const openCategoryModal = (cat: any = null) => {
+  if (!authStore.editMode) return;
+  editingCategory.value = cat;
+  if (cat) {
+    categoryForm.value = {
+      name: cat.name,
+      description: cat.description || '',
+      color: cat.color || '#9d50bb',
+      intentionalCount: cat.intentionalCount,
+      parentId: cat.parentId || null,
+      private: cat.private || false
+    };
+  } else {
+    categoryForm.value = {
+      name: '',
+      description: '',
+      color: '#9d50bb',
+      intentionalCount: null,
+      parentId: null,
+      private: false
+    };
+  }
+  showCategoryModal.value = true;
+};
+
+const saveCategory = async () => {
+  if (!authStore.editMode) return;
+  saving.value = true;
+  try {
+    if (editingCategory.value) {
+      await axios.put(`/api/categories/${editingCategory.value.id}`, categoryForm.value);
+    } else {
+      await axios.post('/api/categories', categoryForm.value);
+    }
+    await fetchData(true);
+    showCategoryModal.value = false;
+  } catch (err) {
+    alert('Failed to save category');
+  } finally {
+    saving.value = false;
+  }
+};
+
+const deleteCategory = async (id: string) => {
+  if (!authStore.editMode) return;
+  if (confirm('Are you sure? This will remove the category from all items.')) {
+    try {
+      await axios.delete(`/api/categories/${id}`);
+      await fetchData(true);
+    } catch (err) {
+      alert('Failed to delete category');
+    }
+  }
+};
+
+const onParentCategoryChange = () => {
+  if (categoryForm.value.parentId) {
+    categoryForm.value.private = true;
+  }
+};
+
+// Transaction Actions
+const openTransactionModal = async (item: any) => {
+  if (!authStore.editMode) return;
+  selectedItem.value = item;
+  transactionForm.value = { delta: 0, note: '', reason: undefined };
+
+  // Fetch latest transactions
+  try {
+    const res = await axios.get(`/api/items/${item.id}`);
+    selectedItem.value = res.data;
+  } catch (err) {}
+
+  if (showDetailModal.value) {
+    modalView.value = 'transactions';
+  } else {
+    showTransactionModal.value = true;
+  }
+};
+
+const saveTransaction = async () => {
+  if (!authStore.editMode) return;
+  if (transactionForm.value.delta === 0) return;
+  saving.value = true;
+  try {
+    await axios.post(`/api/items/${selectedItem.value.id}/transactions`, transactionForm.value);
+    showTransactionModal.value = false;
+    if (showDetailModal.value) {
+      modalView.value = 'detail';
+      const res = await axios.get(`/api/items/${selectedItem.value.id}`);
+      selectedItem.value = res.data;
+    }
+    await fetchData(true);
+  } catch (err) {
+    alert('Failed to update quantity');
+  } finally {
+    saving.value = false;
+  }
+};
+
+// Loan Actions
+const openLoanModal = (item: any) => {
+  if (!authStore.editMode) return;
+  selectedItem.value = item;
+  loanForm.value = { borrower: '', quantity: 1, note: '' };
+  if (showDetailModal.value) {
+    modalView.value = 'lend';
+  } else {
+    showLoanModal.value = true;
+  }
+};
+
+const saveLoan = async () => {
+  if (!authStore.editMode) return;
+  saving.value = true;
+  try {
+    await axios.post(`/api/items/${selectedItem.value.id}/loans`, loanForm.value);
+    showLoanModal.value = false;
+    if (showDetailModal.value) {
+      modalView.value = 'detail';
+      const res = await axios.get(`/api/items/${selectedItem.value.id}`);
+      selectedItem.value = res.data;
+    }
+    await fetchData(true);
+  } catch (err) {
+    alert('Failed to create loan');
+  } finally {
+    saving.value = false;
+  }
+};
+
+const returnLoan = async (id: string) => {
+  if (!authStore.editMode) return;
+  try {
+    await axios.post(`/api/loans/${id}/return`, {});
+    await fetchData(true);
+  } catch (err) {
+    alert('Failed to return loan');
+  }
+};
+
+const deleteLoan = async (id: string) => {
+  if (!authStore.editMode) return;
+  if (confirm('Delete this loan record?')) {
+    try {
+      await axios.delete(`/api/loans/${id}`);
+      await fetchData(true);
+    } catch (err) {
+      alert('Failed to delete loan');
+    }
+  }
+};
+
+
+
+// Helpers
+const getCategoryDisplayName = (cat: any) => {
+  const level = cat.level || 0;
+  return '\u00A0\u00A0'.repeat(level) + cat.name;
+};
+
+const getItemName = (id: string) => items.value.find(i => i.id === id)?.name || 'Unknown Item';
+
+
+onMounted(() => {
+  fetchData();
+});
+
+onUnmounted(() => {
+  stopCamera();
+});
+</script>
 <template>
   <div class="container" :style="{ '--grid-columns': authStore.gridColumns }">
     <!-- Tabs -->
@@ -41,6 +781,7 @@
               <h3 class="item-title-overlay">
                 <Lock v-if="item.private" :size="12" color="#f59e0b" style="margin-right: 4px; vertical-align: middle;" title="Private" />
                 <Users v-if="item.isBorrowed" :size="12" color="#f59e0b" style="margin-right: 4px; vertical-align: middle;" title="Borrowed" />
+                <Gift v-if="item.isGifted" :size="12" color="#f59e0b" style="margin-right: 4px; vertical-align: middle;" title="Gifted" />
                 {{ item.name }}
               </h3>
             </div>
@@ -331,6 +1072,20 @@
             </div>
           </div>
 
+          <div class="form-group" style="margin-top: 10px; border-top: 1px solid var(--border-color); padding-top: 15px; display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
+            <label class="switch-container" style="margin-bottom: 0;">
+              <input type="checkbox" v-model="itemForm.isGifted" />
+              <div class="switch-track">
+                <div class="switch-thumb"></div>
+              </div>
+              <span class="silver-text" style="font-size: 14px;">Gifted</span>
+            </label>
+            <div v-if="itemForm.isGifted" style="flex: 1; min-width: 150px; display: flex; align-items: center; gap: 10px;">
+              <span class="silver-text" style="font-size: 14px;">By:</span>
+              <input v-model="itemForm.giftedBy" type="text" placeholder="Whom?" style="margin: 0;" />
+            </div>
+          </div>
+
           <div class="actions">
             <button type="submit" class="btn-primary" :disabled="saving" style="flex: 1; width: auto;">{{ saving ? 'Saving...' : 'Save' }}</button>
             <button v-if="!editingItem" type="button" class="btn-secondary" :disabled="saving" @click="saveItem(true)" style="flex: 1;">
@@ -546,6 +1301,13 @@
                 {{ selectedItem?.borrowedFrom || 'Someone' }}
               </div>
             </div>
+            <div v-if="selectedItem?.isGifted" class="stat-card" style="border-color: #f59e0b;">
+              <div class="stat-label">Gifted By</div>
+              <div class="stat-value" style="display: flex; align-items: center; justify-content: center; gap: 6px; color: #f59e0b;">
+                <Gift :size="16" />
+                {{ selectedItem?.giftedBy || 'Someone' }}
+              </div>
+            </div>
           </div>
 
           <div v-if="selectedItem?.categoryIds && selectedItem.categoryIds.length > 0" style="margin-top: 20px;">
@@ -738,6 +1500,20 @@
               </div>
             </div>
 
+            <div class="form-group" style="margin-top: 10px; border-top: 1px solid var(--border-color); padding-top: 15px; display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
+              <label class="switch-container" style="margin-bottom: 0;">
+                <input type="checkbox" v-model="itemForm.isGifted" />
+                <div class="switch-track">
+                  <div class="switch-thumb"></div>
+                </div>
+                <span class="silver-text" style="font-size: 14px;">Gifted</span>
+              </label>
+              <div v-if="itemForm.isGifted" style="flex: 1; min-width: 150px; display: flex; align-items: center; gap: 10px;">
+                <span class="silver-text" style="font-size: 14px;">By:</span>
+                <input v-model="itemForm.giftedBy" type="text" placeholder="Whom?" style="margin: 0;" />
+              </div>
+            </div>
+
             <div class="actions">
               <button type="submit" class="btn-primary" :disabled="saving">
                 <Loader2 v-if="saving" class="animate-spin" :size="18" style="vertical-align: middle; margin-right: 8px;" />
@@ -835,753 +1611,3 @@
 
   </div>
 </template>
-
-<script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed, nextTick, watch } from 'vue';
-import axios from 'axios';
-import { useAuthStore } from '../stores/auth';
-import FilterBar from './FilterBar.vue';
-import { useCategories } from '../composables/useCategories';
-import { useItems } from '../composables/useItems';
-import { formatStat, isDefined, getStatColor } from '../utils/formatters';
-import { usageFrequencies, attachments, intentions, joys } from '../utils/constants';
-import {
-  Plus, Edit2, Trash2, Camera,
-  ArrowRightLeft, Package, Tag, Users, ArrowLeft,
-  CheckCircle, X, Lock,
-  Smile, Zap, Target, Heart, Loader2
-} from 'lucide-vue-next';
-import { preload } from '@imgly/background-removal';
-import { downscaleImage } from '../utils/imageProcessor';
-import BackgroundRemovalWorker from '../workers/background-removal.worker?worker';
-
-const authStore = useAuthStore();
-const { categories, fetchCategories, getCategoryName, getCategoryColor } = useCategories();
-const { 
-  items, loading, selectedCategoryIds,
-  fetchItems, filteredItems, totalIndividualItems
-} = useItems();
-
-const saving = ref(false);
-
-const currentTab = ref('items');
-const loans = ref<any[]>([]);
-const categorySearch = ref('');
-
-// Modals state
-const showItemModal = ref(false);
-const showCategoryModal = ref(false);
-const showTransactionModal = ref(false);
-const showLoanModal = ref(false);
-const showDetailModal = ref(false);
-const modalView = ref('detail'); // 'detail', 'edit', 'transactions', 'lend'
-const showCameraModal = ref(false);
-
-const detailModalTitle = computed(() => {
-  if (modalView.value === 'detail') return selectedItem.value?.name;
-  if (modalView.value === 'edit') return editingItem.value ? 'Edit Item' : 'Add New Item';
-  if (modalView.value === 'transactions') return `Adjust Quantity: ${selectedItem.value?.name}`;
-  if (modalView.value === 'lend') return `Lend Item: ${selectedItem.value?.name}`;
-  return '';
-});
-
-const selectedItem = ref<any>(null);
-const editingItem = ref<any>(null);
-const editingCategory = ref<any>(null);
-
-// Forms
-const itemForm = ref({
-  name: '',
-  quantity: 0,
-  usageFrequency: 'undefined',
-  attachment: 'undefined',
-  intention: 'undecided',
-  joy: 'undefined',
-  categoryIds: [] as string[],
-  isBorrowed: false,
-  borrowedFrom: ''
-});
-
-const categoryForm = ref({
-  name: '',
-  description: '',
-  color: '#9d50bb',
-  intentionalCount: null as number | null,
-  parentId: null as string | null,
-  private: false
-});
-
-const transactionForm = ref({
-  delta: 0,
-  note: '',
-  reason: undefined as string | undefined
-});
-
-const loanForm = ref({
-  borrower: '',
-  quantity: 1,
-  note: ''
-});
-
-const fileInputRef = ref<HTMLInputElement | null>(null);
-const videoRef = ref<HTMLVideoElement | null>(null);
-const canvasRef = ref<HTMLCanvasElement | null>(null);
-const itemNameInput = ref<HTMLInputElement | null>(null);
-const file = ref<File | null>(null);
-const preview = ref<string | null>(null);
-const stream = ref<MediaStream | null>(null);
-
-const isolateObject = ref(false);
-const processingBackground = ref(false);
-const originalFile = ref<File | null>(null);
-const originalPreview = ref<string | null>(null);
-
-const setPreview = (source: Blob | string | null) => {
-  if (preview.value && preview.value.startsWith('blob:')) {
-    URL.revokeObjectURL(preview.value);
-  }
-  if (!source) {
-    preview.value = null;
-    return;
-  }
-  if (typeof source === 'string') {
-    preview.value = source;
-  } else {
-    preview.value = URL.createObjectURL(source);
-  }
-};
-
-const setOriginalPreview = (source: Blob | string | null) => {
-  if (originalPreview.value && originalPreview.value.startsWith('blob:')) {
-    URL.revokeObjectURL(originalPreview.value);
-  }
-  if (!source) {
-    originalPreview.value = null;
-    return;
-  }
-  if (typeof source === 'string') {
-    originalPreview.value = source;
-  } else {
-    originalPreview.value = URL.createObjectURL(source);
-  }
-};
-
-let worker: Worker | null = null;
-
-const initWorker = () => {
-  if (!worker) {
-    worker = new BackgroundRemovalWorker();
-  }
-};
-
-const preloadBackgroundRemoval = () => {
-  preload({
-    publicPath: window.location.origin + '/background-removal-data/'
-  });
-};
-
-watch(() => authStore.editMode, (isEdit) => {
-  if (isEdit) {
-    preloadBackgroundRemoval();
-    initWorker();
-  }
-}, { immediate: true });
-
-watch([showItemModal, showCategoryModal, showTransactionModal, showLoanModal, showDetailModal, showCameraModal], (vals) => {
-  if (vals.some(v => v)) {
-    document.body.classList.add('modal-open');
-  } else {
-    nextTick(() => {
-      if (document.querySelectorAll('.modal-overlay').length === 0) {
-        document.body.classList.remove('modal-open');
-        setPreview(null);
-        setOriginalPreview(null);
-      }
-    });
-  }
-});
-
-onUnmounted(() => {
-  setPreview(null);
-  setOriginalPreview(null);
-  if (worker) {
-    worker.terminate();
-    worker = null;
-  }
-  nextTick(() => {
-    if (document.querySelectorAll('.modal-overlay').length === 0) {
-      document.body.classList.remove('modal-open');
-    }
-  });
-});
-
-// Computed
-const closeMatches = computed(() => {
-  const name = itemForm.value.name.trim().toLowerCase();
-  if (name.length < 2) return [];
-  
-  return items.value
-    .filter(item => {
-      if (editingItem.value && item.id === editingItem.value.id) return false;
-      return item.name.toLowerCase().includes(name);
-    })
-    .slice(0, 5);
-});
-
-const visibleCategories = computed(() => {
-  return authStore.showPrivate ? categories.value : categories.value.filter(c => !c.private);
-});
-
-const filteredCategories = computed(() => {
-  const q = categorySearch.value.trim().toLowerCase();
-  const base = [...visibleCategories.value] as any[];
-  const results = q ? base.filter(c =>
-    c.name.toLowerCase().includes(q) ||
-    (c.description || '').toLowerCase().includes(q)
-  ) : base;
-
-  return results.sort((a, b) => a.name.localeCompare(b.name));
-});
-
-const sortedCategories = computed(() => {
-  let cats = categories.value;
-  if (!authStore.showPrivate) {
-    cats = cats.filter(c => !c.private);
-  }
-
-  const result: any[] = [];
-  const addChildren = (parentId: string | null, level: number) => {
-    const children = cats
-      .filter(c => (c.parentId || null) === parentId)
-      .sort((a, b) => a.name.localeCompare(b.name));
-    
-    for (const child of children) {
-      result.push({ ...child, level });
-      addChildren(child.id, level + 1);
-    }
-  };
-  addChildren(null, 0);
-  
-  // Add any categories that might have been missed (e.g. circular dependency or missing parent)
-  const addedIds = new Set(result.map(c => c.id));
-  const missed = cats.filter(c => !addedIds.has(c.id));
-  for (const cat of missed) {
-    result.push({ ...cat, level: 0 });
-  }
-  
-  return result;
-});
-
-watch(() => authStore.showPrivate, () => {
-  fetchData(true);
-});
-
-// Fetching
-const fetchData = async (force = false) => {
-  const [_, __, loansRes] = await Promise.all([
-    fetchCategories(force),
-    fetchItems(force),
-    axios.get('/api/loans')
-  ]);
-  
-  loans.value = (loansRes as any).data;
-};
-
-// Item Actions
-const openItemModal = (item: any = null, keepImage = false) => {
-  if (!authStore.editMode) return;
-  editingItem.value = item;
-  if (!keepImage) {
-    file.value = null;
-    originalFile.value = null;
-    isolateObject.value = false;
-  }
-  
-  if (item) {
-    isolateObject.value = item.isIsolated || false;
-    itemForm.value = {
-      name: item.name,
-      quantity: item.quantity,
-      usageFrequency: item.usageFrequency,
-      attachment: item.attachment,
-      intention: item.intention,
-      joy: item.joy,
-      categoryIds: [...(item.categoryIds || [])],
-      isBorrowed: item.isBorrowed || false,
-      borrowedFrom: item.borrowedFrom || ''
-    };
-    if (item.image) {
-      setPreview(item.image);
-      setOriginalPreview(item.image);
-    } else {
-      setPreview(null);
-      setOriginalPreview(null);
-    }
-  } else {
-    itemForm.value = {
-      name: '',
-      quantity: 1,
-      usageFrequency: 'undefined',
-      attachment: 'undefined',
-      intention: 'undecided',
-      joy: 'undefined',
-      categoryIds: [],
-      isBorrowed: false,
-      borrowedFrom: ''
-    };
-    setPreview(null);
-    setOriginalPreview(null);
-  }
-  
-  if (showDetailModal.value) {
-    modalView.value = 'edit';
-  } else {
-    showItemModal.value = true;
-  }
-  
-  nextTick(() => {
-    if (!item) {
-      itemNameInput.value?.focus();
-    }
-  });
-};
-
-
-const triggerFileInput = () => startCamera();
-
-const handleFileChange = async (e: any) => {
-  const selectedFile = e.target.files[0];
-  if (selectedFile) {
-    originalFile.value = selectedFile;
-    setOriginalPreview(selectedFile);
-    
-    if (!isolateObject.value) {
-      setPreview(selectedFile);
-      file.value = selectedFile;
-    }
-
-    if (isolateObject.value) {
-      await applyBackgroundRemoval(selectedFile);
-    }
-  }
-};
-
-const handleIsolateChange = async () => {
-  if (isolateObject.value) {
-    if (originalFile.value) {
-      await applyBackgroundRemoval(originalFile.value);
-    }
-  } else {
-    // Revert to original
-    if (originalFile.value) {
-      file.value = originalFile.value;
-      setPreview(originalFile.value);
-    }
-  }
-};
-
-const applyBackgroundRemoval = async (sourceFile: File) => {
-  processingBackground.value = true;
-  initWorker();
-  try {
-    const downscaled = await downscaleImage(sourceFile);
-    
-    return new Promise<void>((resolve, reject) => {
-      if (!worker) return reject(new Error('Worker not initialized'));
-      
-      const handleMessage = (e: MessageEvent) => {
-        worker?.removeEventListener('message', handleMessage);
-        if (e.data.error) {
-          reject(new Error(e.data.error));
-        } else {
-          const blob = e.data.blob;
-          const newFile = new File([blob], sourceFile.name.replace(/\.[^/.]+$/, "") + ".png", { type: 'image/png' });
-          file.value = newFile;
-          setPreview(blob);
-          resolve();
-        }
-      };
-      
-      worker.addEventListener('message', handleMessage);
-      worker.postMessage({
-        file: downscaled,
-        config: {
-          publicPath: window.location.origin + '/background-removal-data/'
-        }
-      });
-    });
-  } catch (err: any) {
-    console.error('Background removal failed', err);
-    isolateObject.value = false;
-    alert('Failed to isolate object: ' + (err.message || 'Please try again or use a clearer photo.'));
-  } finally {
-    processingBackground.value = false;
-  }
-};
-
-const removeImage = () => {
-  file.value = null;
-  setPreview(null);
-  originalFile.value = null;
-  setOriginalPreview(null);
-  isolateObject.value = false;
-};
-
-const startCamera = async () => {
-  try {
-    // Check if getUserMedia is supported
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      throw new Error('Camera not supported');
-    }
-    
-    showCameraModal.value = true;
-    await nextTick();
-    
-    stream.value = await navigator.mediaDevices.getUserMedia({ 
-      video: { facingMode: 'environment' }, 
-      audio: false 
-    });
-    
-    if (videoRef.value) {
-      videoRef.value.srcObject = stream.value;
-    }
-  } catch (err) {
-    console.error('Failed to start camera', err);
-    showCameraModal.value = false;
-    // Fallback to file input
-    fileInputRef.value?.click();
-  }
-};
-
-const stopCamera = () => {
-  if (stream.value) {
-    stream.value.getTracks().forEach(track => track.stop());
-    stream.value = null;
-  }
-};
-
-const closeCamera = () => {
-  stopCamera();
-  showCameraModal.value = false;
-};
-
-const capturePhoto = async () => {
-  if (videoRef.value && canvasRef.value) {
-    const video = videoRef.value;
-    const canvas = canvasRef.value;
-    
-    // Use video dimensions
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    
-    const ctx = canvas.getContext('2d');
-    if (ctx) {
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
-      
-      // Convert to blob and file
-      const parts = dataUrl.split(',');
-      const byteString = atob(parts[1] || '');
-      const mimeString = (parts[0] || '').split(':')[1]?.split(';')[0] || 'image/jpeg';
-      const ab = new ArrayBuffer(byteString.length);
-      const ia = new Uint8Array(ab);
-      for (let i = 0; i < byteString.length; i++) {
-        ia[i] = byteString.charCodeAt(i);
-      }
-      const blob = new Blob([ab], { type: mimeString });
-      const capturedFile = new File([blob], 'captured_photo.jpg', { type: 'image/jpeg' });
-
-      originalFile.value = capturedFile;
-      setOriginalPreview(capturedFile);
-
-      if (isolateObject.value) {
-        await applyBackgroundRemoval(capturedFile);
-      } else {
-        setPreview(capturedFile);
-        file.value = capturedFile;
-      }
-      
-      closeCamera();
-    }
-  }
-};
-
-const toggleCategory = (catId: string) => {
-  const idx = itemForm.value.categoryIds.indexOf(catId);
-  if (idx > -1) itemForm.value.categoryIds.splice(idx, 1);
-  else itemForm.value.categoryIds.push(catId);
-};
-
-const saveItem = async (stay = false) => {
-  if (!authStore.editMode) return;
-  saving.value = true;
-  try {
-    const formData = new FormData();
-    formData.append('isIsolated', isolateObject.value.toString());
-    Object.entries(itemForm.value).forEach(([key, val]) => {
-      if (key === 'categoryIds') formData.append(key, JSON.stringify(val));
-      else formData.append(key, val as any);
-    });
-    
-    if (file.value) formData.append('image', file.value);
-    else if (!preview.value && editingItem.value?.image) formData.append('removeImage', 'true');
-
-    if (editingItem.value) {
-      await axios.put(`/api/items/${editingItem.value.id}`, formData);
-    } else {
-      await axios.post('/api/items', formData);
-    }
-    
-    if (stay) {
-      itemForm.value = {
-        name: '',
-        quantity: 1,
-        usageFrequency: 'undefined',
-        attachment: 'undefined',
-        intention: 'undecided',
-        joy: 'undefined',
-        categoryIds: [],
-        isBorrowed: false,
-        borrowedFrom: ''
-      };
-      file.value = null;
-      setPreview(null);
-      originalFile.value = null;
-      setOriginalPreview(null);
-      isolateObject.value = false;
-      nextTick(() => {
-        itemNameInput.value?.focus();
-      });
-    } else {
-      showItemModal.value = false;
-      if (showDetailModal.value) {
-        modalView.value = 'detail';
-        // Refresh selectedItem after save
-        if (editingItem.value) {
-           const res = await axios.get(`/api/items/${editingItem.value.id}`);
-           selectedItem.value = res.data;
-        }
-      }
-    }
-    await fetchData(true);
-  } catch (err) {
-    alert('Failed to save item');
-  } finally {
-    saving.value = false;
-  }
-};
-
-const viewItemDetails = async (item: any) => {
-  try {
-    const res = await axios.get(`/api/items/${item.id}`);
-    selectedItem.value = res.data;
-    if (authStore.editMode) {
-      openItemModal(res.data);
-    } else {
-      modalView.value = 'detail';
-      showDetailModal.value = true;
-    }
-  } catch (err) {
-    console.error(err);
-  }
-};
-
-const confirmDeleteItem = async (id: string) => {
-  if (!authStore.editMode) return;
-  if (confirm('Are you sure you want to delete this item?')) {
-    try {
-      await axios.delete(`/api/items/${id}`);
-      await fetchData(true);
-    } catch (err) {
-      alert('Failed to delete item');
-    }
-  }
-};
-
-// Category Actions
-const toggleFilterCategory = (catId: string) => {
-  if (!Array.isArray(selectedCategoryIds.value)) {
-    selectedCategoryIds.value = [];
-  }
-  const idx = selectedCategoryIds.value.indexOf(catId);
-  if (idx > -1) {
-    selectedCategoryIds.value.splice(idx, 1);
-  } else {
-    selectedCategoryIds.value.push(catId);
-  }
-  currentTab.value = 'items';
-  showDetailModal.value = false;
-};
-
-
-const openCategoryModal = (cat: any = null) => {
-  if (!authStore.editMode) return;
-  editingCategory.value = cat;
-  if (cat) {
-    categoryForm.value = {
-      name: cat.name,
-      description: cat.description || '',
-      color: cat.color || '#9d50bb',
-      intentionalCount: cat.intentionalCount,
-      parentId: cat.parentId || null,
-      private: cat.private || false
-    };
-  } else {
-    categoryForm.value = {
-      name: '',
-      description: '',
-      color: '#9d50bb',
-      intentionalCount: null,
-      parentId: null,
-      private: false
-    };
-  }
-  showCategoryModal.value = true;
-};
-
-const saveCategory = async () => {
-  if (!authStore.editMode) return;
-  saving.value = true;
-  try {
-    if (editingCategory.value) {
-      await axios.put(`/api/categories/${editingCategory.value.id}`, categoryForm.value);
-    } else {
-      await axios.post('/api/categories', categoryForm.value);
-    }
-    await fetchData(true);
-  } catch (err) {
-    alert('Failed to save category');
-  } finally {
-    saving.value = false;
-  }
-};
-
-const deleteCategory = async (id: string) => {
-  if (!authStore.editMode) return;
-  if (confirm('Are you sure? This will remove the category from all items.')) {
-    try {
-      await axios.delete(`/api/categories/${id}`);
-      await fetchData(true);
-    } catch (err) {
-      alert('Failed to delete category');
-    }
-  }
-};
-
-const onParentCategoryChange = () => {
-  if (categoryForm.value.parentId) {
-    categoryForm.value.private = true;
-  }
-};
-
-// Transaction Actions
-const openTransactionModal = async (item: any) => {
-  if (!authStore.editMode) return;
-  selectedItem.value = item;
-  transactionForm.value = { delta: 0, note: '', reason: undefined };
-  
-  // Fetch latest transactions
-  try {
-    const res = await axios.get(`/api/items/${item.id}`);
-    selectedItem.value = res.data;
-  } catch (err) {}
-  
-  if (showDetailModal.value) {
-    modalView.value = 'transactions';
-  } else {
-    showTransactionModal.value = true;
-  }
-};
-
-const saveTransaction = async () => {
-  if (!authStore.editMode) return;
-  if (transactionForm.value.delta === 0) return;
-  saving.value = true;
-  try {
-    await axios.post(`/api/items/${selectedItem.value.id}/transactions`, transactionForm.value);
-    showTransactionModal.value = false;
-    if (showDetailModal.value) {
-      modalView.value = 'detail';
-      const res = await axios.get(`/api/items/${selectedItem.value.id}`);
-      selectedItem.value = res.data;
-    }
-    await fetchData(true);
-  } catch (err) {
-    alert('Failed to update quantity');
-  } finally {
-    saving.value = false;
-  }
-};
-
-// Loan Actions
-const openLoanModal = (item: any) => {
-  if (!authStore.editMode) return;
-  selectedItem.value = item;
-  loanForm.value = { borrower: '', quantity: 1, note: '' };
-  if (showDetailModal.value) {
-    modalView.value = 'lend';
-  } else {
-    showLoanModal.value = true;
-  }
-};
-
-const saveLoan = async () => {
-  if (!authStore.editMode) return;
-  saving.value = true;
-  try {
-    await axios.post(`/api/items/${selectedItem.value.id}/loans`, loanForm.value);
-    showLoanModal.value = false;
-    if (showDetailModal.value) {
-      modalView.value = 'detail';
-      const res = await axios.get(`/api/items/${selectedItem.value.id}`);
-      selectedItem.value = res.data;
-    }
-    await fetchData(true);
-  } catch (err) {
-    alert('Failed to create loan');
-  } finally {
-    saving.value = false;
-  }
-};
-
-const returnLoan = async (id: string) => {
-  if (!authStore.editMode) return;
-  try {
-    await axios.post(`/api/loans/${id}/return`, {});
-    await fetchData(true);
-  } catch (err) {
-    alert('Failed to return loan');
-  }
-};
-
-const deleteLoan = async (id: string) => {
-  if (!authStore.editMode) return;
-  if (confirm('Delete this loan record?')) {
-    try {
-      await axios.delete(`/api/loans/${id}`);
-      await fetchData(true);
-    } catch (err) {
-      alert('Failed to delete loan');
-    }
-  }
-};
-
-
-
-// Helpers
-const getCategoryDisplayName = (cat: any) => {
-  const level = cat.level || 0;
-  return '\u00A0\u00A0'.repeat(level) + cat.name;
-};
-
-const getItemName = (id: string) => items.value.find(i => i.id === id)?.name || 'Unknown Item';
-
-
-onMounted(() => {
-  fetchData();
-});
-
-onUnmounted(() => {
-  stopCamera();
-});
-</script>

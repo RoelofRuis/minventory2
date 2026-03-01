@@ -29,6 +29,8 @@ export interface Item {
     isIsolated?: boolean;
     isBorrowed?: boolean;
     borrowedFrom?: Buffer; // Encrypted Buffer
+    isGifted?: boolean;
+    giftedBy?: Buffer; // Encrypted Buffer
 }
 
 export interface Category {

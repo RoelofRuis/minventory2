@@ -1,43 +1,3 @@
-<template>
-  <div class="multiselect-container" ref="dropdownRef">
-    <div class="multiselect-input" @click="focusCategorySearch">
-      <Tag :size="18" class="silver-text" style="margin-right: 4px; flex-shrink: 0;" />
-      <div class="multiselect-badges-wrapper">
-        <div v-for="catId in selectedIds" :key="catId" class="multiselect-badge">
-          {{ getCategoryName(catId) }}
-          <X :size="14" @click.stop="toggleFilterCategory(catId)" />
-        </div>
-        <input 
-          v-model="categorySearchQuery" 
-          ref="categorySearchInput"
-          :placeholder="selectedIds.length === 0 ? 'Filter categories...' : ''" 
-          @focus="showCategoryDropdown = true"
-        />
-      </div>
-      <div v-if="selectedIds.length > 1" class="mode-toggle" @click.stop="toggleMode" :title="'Current mode: ' + (mode === 'or' ? 'At least one' : 'All selected')">
-        {{ mode.toUpperCase() }}
-      </div>
-    </div>
-    <div v-if="showCategoryDropdown" class="dropdown-menu">
-      <div class="dropdown-actions">
-         <span class="silver-text" style="font-size: 0.8rem;">
-           {{ filteredSearchCategories.length }} categories
-         </span>
-         <button v-if="selectedIds.length > 0" type="button" class="btn-link" @click="emit('update:selectedIds', [])">Clear all</button>
-      </div>
-      <div v-for="cat in filteredSearchCategories" :key="cat.id" 
-           class="dropdown-item" 
-           :class="{ selected: selectedIds.includes(cat.id) }"
-           :style="{ paddingLeft: (cat.level * 20 + 16) + 'px' }"
-           @click="toggleFilterCategory(cat.id)">
-        <span style="flex: 1;">{{ cat.name }}</span>
-        <Check v-if="selectedIds.includes(cat.id)" :size="16" class="accent-text" />
-      </div>
-      <div v-if="filteredSearchCategories.length === 0" class="dropdown-item silver-text">No categories found</div>
-    </div>
-  </div>
-</template>
-
 <script setup lang="ts">
 import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue';
 import { Tag, X, Check } from 'lucide-vue-next';
@@ -68,9 +28,9 @@ const sortedCategories = computed(() => {
   const result: any[] = [{ id: '__unset__', name: '(No Category)', level: 0 }];
   const addChildren = (parentId: string | null, level: number) => {
     const children = cats
-      .filter(c => (c.parentId || null) === parentId)
-      .sort((a, b) => a.name.localeCompare(b.name));
-    
+        .filter(c => (c.parentId || null) === parentId)
+        .sort((a, b) => a.name.localeCompare(b.name));
+
     for (const child of children) {
       result.push({ ...child, level });
       addChildren(child.id, level + 1);
@@ -88,8 +48,8 @@ const sortedCategories = computed(() => {
 const filteredSearchCategories = computed(() => {
   if (!categorySearchQuery.value) return sortedCategories.value;
   const q = categorySearchQuery.value.toLowerCase();
-  return sortedCategories.value.filter(cat => 
-    cat.name.toLowerCase().includes(q)
+  return sortedCategories.value.filter(cat =>
+      cat.name.toLowerCase().includes(q)
   );
 });
 
@@ -130,6 +90,47 @@ onUnmounted(() => {
   window.removeEventListener('click', handleClickOutside);
 });
 </script>
+
+
+<template>
+  <div class="multiselect-container" ref="dropdownRef">
+    <div class="multiselect-input" @click="focusCategorySearch">
+      <Tag :size="18" class="silver-text" style="margin-right: 4px; flex-shrink: 0;" />
+      <div class="multiselect-badges-wrapper">
+        <div v-for="catId in selectedIds" :key="catId" class="multiselect-badge">
+          {{ getCategoryName(catId) }}
+          <X :size="14" @click.stop="toggleFilterCategory(catId)" />
+        </div>
+        <input 
+          v-model="categorySearchQuery" 
+          ref="categorySearchInput"
+          :placeholder="selectedIds.length === 0 ? 'Filter categories...' : ''" 
+          @focus="showCategoryDropdown = true"
+        />
+      </div>
+      <div v-if="selectedIds.length > 1" class="mode-toggle" @click.stop="toggleMode" :title="'Current mode: ' + (mode === 'or' ? 'At least one' : 'All selected')">
+        {{ mode.toUpperCase() }}
+      </div>
+    </div>
+    <div v-if="showCategoryDropdown" class="dropdown-menu">
+      <div class="dropdown-actions">
+         <span class="silver-text" style="font-size: 0.8rem;">
+           {{ filteredSearchCategories.length }} categories
+         </span>
+         <button v-if="selectedIds.length > 0" type="button" class="btn-link" @click="emit('update:selectedIds', [])">Clear all</button>
+      </div>
+      <div v-for="cat in filteredSearchCategories" :key="cat.id" 
+           class="dropdown-item" 
+           :class="{ selected: selectedIds.includes(cat.id) }"
+           :style="{ paddingLeft: (cat.level * 20 + 16) + 'px' }"
+           @click="toggleFilterCategory(cat.id)">
+        <span style="flex: 1;">{{ cat.name }}</span>
+        <Check v-if="selectedIds.includes(cat.id)" :size="16" class="accent-text" />
+      </div>
+      <div v-if="filteredSearchCategories.length === 0" class="dropdown-item silver-text">No categories found</div>
+    </div>
+  </div>
+</template>
 
 <style scoped>
 .multiselect-badges-wrapper {

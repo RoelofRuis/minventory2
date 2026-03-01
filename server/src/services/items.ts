@@ -64,7 +64,9 @@ export class ItemService {
             joy: itemData.joy || Joy.Medium,
             isIsolated: itemData.isIsolated === 'true' || itemData.isIsolated === true,
             isBorrowed: itemData.isBorrowed === 'true' || itemData.isBorrowed === true,
-            borrowedFrom: itemData.borrowedFrom ? encrypt(itemData.borrowedFrom, encryptionKey) : undefined
+            borrowedFrom: itemData.borrowedFrom ? encrypt(itemData.borrowedFrom, encryptionKey) : undefined,
+            isGifted: itemData.isGifted === 'true' || itemData.isGifted === true,
+            giftedBy: itemData.giftedBy ? encrypt(itemData.giftedBy, encryptionKey) : undefined
         };
 
         await this.itemRepository.create(item);
@@ -132,6 +134,12 @@ export class ItemService {
         if (itemData.borrowedFrom !== undefined) {
             existingItem.borrowedFrom = itemData.borrowedFrom ? encrypt(itemData.borrowedFrom, encryptionKey) : undefined;
         }
+        if (itemData.isGifted !== undefined) {
+            existingItem.isGifted = itemData.isGifted === 'true' || itemData.isGifted === true;
+        }
+        if (itemData.giftedBy !== undefined) {
+            existingItem.giftedBy = itemData.giftedBy ? encrypt(itemData.giftedBy, encryptionKey) : undefined;
+        }
 
         await this.itemRepository.update(existingItem);
 
@@ -172,6 +180,7 @@ export class ItemService {
                 let nameBuffer = Buffer.isBuffer(item.name) ? item.name : Buffer.from(item.name, 'base64');
                 let decryptedName: string;
                 let decryptedBorrowedFrom: string | undefined;
+                let decryptedGiftedBy: string | undefined;
                 
                 try {
                     decryptedName = decrypt(nameBuffer, encryptionKey).toString();
@@ -189,11 +198,20 @@ export class ItemService {
                     }
                 }
 
+                if (item.giftedBy) {
+                    try {
+                        decryptedGiftedBy = decrypt(item.giftedBy, encryptionKey).toString();
+                    } catch (err) {
+                        decryptedGiftedBy = '[Decryption Failed]';
+                    }
+                }
+
                 const updatedAtTs = item.updatedAt ? new Date(item.updatedAt).getTime() : Date.now();
                 return {
                     ...item,
                     name: decryptedName,
                     borrowedFrom: decryptedBorrowedFrom,
+                    giftedBy: decryptedGiftedBy,
                     image: null,
                     imageUrl: item.imageBlob ? `/api/items/${item.id}/image?v=${updatedAtTs}` : null,
                     thumbUrl: item.thumbnailBlob ? `/api/items/${item.id}/thumb?v=${updatedAtTs}` : null,
@@ -225,6 +243,7 @@ export class ItemService {
         let nameBuffer = Buffer.isBuffer(item.name) ? item.name : Buffer.from(item.name, 'base64');
         let decryptedName: string;
         let decryptedBorrowedFrom: string | undefined;
+        let decryptedGiftedBy: string | undefined;
         
         try {
             decryptedName = decrypt(nameBuffer, encryptionKey).toString();
@@ -242,6 +261,14 @@ export class ItemService {
             }
         }
 
+        if (item.giftedBy) {
+            try {
+                decryptedGiftedBy = decrypt(item.giftedBy, encryptionKey).toString();
+            } catch (err) {
+                decryptedGiftedBy = '[Decryption Failed]';
+            }
+        }
+
         let decryptedImage = '';
         if (item.imageBlob) {
             decryptedImage = decrypt(item.imageBlob, encryptionKey).toString('base64');
@@ -255,6 +282,7 @@ export class ItemService {
             ...item,
             name: decryptedName,
             borrowedFrom: decryptedBorrowedFrom,
+            giftedBy: decryptedGiftedBy,
             image: decryptedImage ? `data:image/jpeg;base64,${decryptedImage}` : null,
             imageUrl: item.imageBlob ? `/api/items/${item.id}/image?v=${updatedAtTs}` : null,
             thumbUrl: item.thumbnailBlob ? `/api/items/${item.id}/thumb?v=${updatedAtTs}` : null,
