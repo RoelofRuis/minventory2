@@ -1,25 +1,14 @@
-import { ref } from 'vue';
-import axios from 'axios';
+import { storeToRefs } from 'pinia';
+import { useCategoryStore } from '../stores/category';
 
 export function useCategories() {
-  const categories = ref<any[]>([]);
-
-  const fetchCategories = async () => {
-    try {
-      const res = await axios.get('/api/categories');
-      categories.value = res.data.sort((a: any, b: any) => a.name.localeCompare(b.name));
-    } catch (err) {
-      console.error('Failed to fetch categories', err);
-    }
-  };
-
-  const getCategoryName = (id: string) => categories.value.find(c => c.id === id)?.name || 'Unknown';
-  const getCategoryColor = (id: string) => categories.value.find(c => c.id === id)?.color || 'var(--accent-purple)';
+  const store = useCategoryStore();
+  const { categories } = storeToRefs(store);
 
   return {
     categories,
-    fetchCategories,
-    getCategoryName,
-    getCategoryColor
+    fetchCategories: store.fetchCategories,
+    getCategoryName: store.getCategoryName,
+    getCategoryColor: store.getCategoryColor
   };
 }

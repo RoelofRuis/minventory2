@@ -1073,14 +1073,14 @@ const sortedCategories = computed(() => {
 });
 
 watch(() => authStore.showPrivate, () => {
-  fetchData();
+  fetchData(true);
 });
 
 // Fetching
-const fetchData = async () => {
+const fetchData = async (force = false) => {
   const [_, __, loansRes] = await Promise.all([
-    fetchCategories(),
-    fetchItems(),
+    fetchCategories(force),
+    fetchItems(force),
     axios.get('/api/loans')
   ]);
   
@@ -1363,7 +1363,7 @@ const saveItem = async (stay = false) => {
         }
       }
     }
-    await fetchData();
+    await fetchData(true);
   } catch (err) {
     alert('Failed to save item');
   } finally {
@@ -1391,7 +1391,7 @@ const confirmDeleteItem = async (id: string) => {
   if (confirm('Are you sure you want to delete this item?')) {
     try {
       await axios.delete(`/api/items/${id}`);
-      await fetchData();
+      await fetchData(true);
     } catch (err) {
       alert('Failed to delete item');
     }
@@ -1448,8 +1448,7 @@ const saveCategory = async () => {
     } else {
       await axios.post('/api/categories', categoryForm.value);
     }
-    showCategoryModal.value = false;
-    await fetchData();
+    await fetchData(true);
   } catch (err) {
     alert('Failed to save category');
   } finally {
@@ -1462,7 +1461,7 @@ const deleteCategory = async (id: string) => {
   if (confirm('Are you sure? This will remove the category from all items.')) {
     try {
       await axios.delete(`/api/categories/${id}`);
-      await fetchData();
+      await fetchData(true);
     } catch (err) {
       alert('Failed to delete category');
     }
@@ -1506,7 +1505,7 @@ const saveTransaction = async () => {
       const res = await axios.get(`/api/items/${selectedItem.value.id}`);
       selectedItem.value = res.data;
     }
-    await fetchData();
+    await fetchData(true);
   } catch (err) {
     alert('Failed to update quantity');
   } finally {
@@ -1537,7 +1536,7 @@ const saveLoan = async () => {
       const res = await axios.get(`/api/items/${selectedItem.value.id}`);
       selectedItem.value = res.data;
     }
-    await fetchData();
+    await fetchData(true);
   } catch (err) {
     alert('Failed to create loan');
   } finally {
@@ -1549,7 +1548,7 @@ const returnLoan = async (id: string) => {
   if (!authStore.editMode) return;
   try {
     await axios.post(`/api/loans/${id}/return`, {});
-    await fetchData();
+    await fetchData(true);
   } catch (err) {
     alert('Failed to return loan');
   }
@@ -1560,7 +1559,7 @@ const deleteLoan = async (id: string) => {
   if (confirm('Delete this loan record?')) {
     try {
       await axios.delete(`/api/loans/${id}`);
-      await fetchData();
+      await fetchData(true);
     } catch (err) {
       alert('Failed to delete loan');
     }

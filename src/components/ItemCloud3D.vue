@@ -71,7 +71,7 @@ const { categories, fetchCategories, getCategoryName, getCategoryColor } = useCa
 const visibleCategories = computed(() => authStore.showPrivate ? categories.value : categories.value.filter(c => !c.private));
 const { 
   items, loading, 
-  fetchItems, filteredItems, totalIndividualItems
+  fetchItems, fetchObjectUrl, filteredItems, totalIndividualItems
 } = useItems(categories);
 
 const container = ref<HTMLElement | null>(null);
@@ -110,26 +110,17 @@ watch(items, () => {
 watch(() => authStore.showPrivate, async (val) => {
   if (val) {
     loading.value = true;
-    await fetchData();
+    await fetchData(true);
     rebuildCloud();
     loading.value = false;
-  } else {
-    // Remove private items from memory and rebuild the cloud without them
-    items.value = items.value.filter(i => !i.private);
-    // Revoke and clear any cached object URLs to avoid retaining private media
-    imageUrlCache.forEach((objUrl) => {
-      try { URL.revokeObjectURL(objUrl); } catch {}
-    });
-    imageUrlCache.clear();
-    rebuildCloud();
   }
 });
 
-const fetchData = async () => {
+const fetchData = async (force = false) => {
   try {
     await Promise.all([
-      fetchItems(),
-      fetchCategories()
+      fetchItems(force),
+      fetchCategories(force)
     ]);
   } catch (err) {
     console.error('Failed to fetch data', err);
@@ -354,22 +345,6 @@ const drawCircularItem = (ctx: CanvasRenderingContext2D, img: HTMLImageElement |
   ctx.shadowBlur = 0;
 };
 
-const imageUrlCache = new Map<string, string>();
-
-const fetchObjectUrl = async (url: string): Promise<string> => {
-  if (imageUrlCache.has(url)) return imageUrlCache.get(url)!;
-  try {
-    const res = await axios.get(url, {
-      responseType: 'blob'
-    });
-    const objectUrl = URL.createObjectURL(res.data);
-    imageUrlCache.set(url, objectUrl);
-    return objectUrl;
-  } catch (e) {
-    console.warn('Failed to fetch image', e);
-    return '';
-  }
-};
 
 const createItemsCloud = () => {
   const halfRange = CLOUD_RANGE / 2;
@@ -471,12 +446,6 @@ const onWindowResize = () => {
 };
 
 const rebuildCloud = () => {
-  // Clear object URL cache
-  imageUrlCache.forEach(url => {
-    try { URL.revokeObjectURL(url); } catch {}
-  });
-  imageUrlCache.clear();
-
   // Properly dispose and clear existing sprites and materials
   const materials = new Set<THREE.SpriteMaterial>();
   const textures = new Set<THREE.Texture>();
@@ -576,6 +545,7 @@ const onMouseUp = async (event: MouseEvent) => {
 onMounted(async () => {
   await fetchData();
   initThree();
+  rebuildCloud(); // Build immediately after setup
   if (renderer) {
     renderer.domElement.addEventListener('mousedown', onMouseDown);
     renderer.domElement.addEventListener('mouseup', onMouseUp);
@@ -614,8 +584,6 @@ onUnmounted(() => {
     
     renderer.dispose();
   }
-  imageUrlCache.forEach(url => URL.revokeObjectURL(url));
-  imageUrlCache.clear();
 });
 </script>
 
