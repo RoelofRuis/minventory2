@@ -86,7 +86,7 @@ let animationFrameId: number;
 const spriteGroup = new THREE.Group();
 const textureCache = new Map<number, THREE.Texture>();
 const CLOUD_RANGE = 800;
-const FADE_ZONE = 80;
+const FADE_ZONE = 50;
 
 const updateSpriteOpacities = () => {
   const visibleIds = new Set(filteredItems.value.map(i => i.id));
@@ -182,8 +182,7 @@ const initThree = () => {
   });
   const particlesMesh = new THREE.Points(particlesGeometry, particlesMaterial);
   scene.add(particlesMesh);
-
-  createItemsCloud();
+  
   updateSpriteOpacities();
   animate();
   
@@ -239,14 +238,14 @@ const drawCircularItem = (ctx: CanvasRenderingContext2D, img: HTMLImageElement |
 
   // Category Blips
   if (itemCategories.length > 0) {
-    const blipRadius = isIsolated ? 60 : 52;
+    const blipRadius = isIsolated ? 54 : 48;
     itemCategories.slice(0, 5).forEach((cat, i) => {
       ctx.beginPath();
       const angle = (i / Math.min(itemCategories.length, 5)) * Math.PI * 2 - Math.PI / 2;
       const r = blipRadius; 
       const bx = 64 + Math.cos(angle) * r;
       const by = 64 + Math.sin(angle) * r;
-      ctx.arc(bx, by, 6, 0, Math.PI * 2);
+      ctx.arc(bx, by, 5, 0, Math.PI * 2);
       ctx.fillStyle = cat.color || '#a78bfa';
       ctx.fill();
       ctx.strokeStyle = 'white';
