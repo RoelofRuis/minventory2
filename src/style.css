@@ -182,7 +182,7 @@ input:focus, select:focus, textarea:focus {
 .grid {
   display: grid;
   grid-template-columns: repeat(var(--grid-columns, 3), 1fr);
-  gap: 12px;
+  gap: 6px;
 }
 
 .item-card {
