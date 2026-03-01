@@ -1,6 +1,6 @@
 import { Knex } from 'knex';
-import { User, Item, Category, QuantityTransaction, Loan } from '../models/types.js';
-import { IUserRepository, IItemRepository, ICategoryRepository, IQuantityTransactionRepository, ILoanRepository } from './interfaces.js';
+import { User, Item, Category, QuantityTransaction, Loan, ArtisticQuestion } from '../models/types.js';
+import { IUserRepository, IItemRepository, ICategoryRepository, IQuantityTransactionRepository, ILoanRepository, IArtisticQuestionRepository } from './interfaces.js';
 
 export class PostgresUserRepository implements IUserRepository {
     constructor(private knex: Knex) {}
@@ -157,5 +157,29 @@ export class PostgresLoanRepository implements ILoanRepository {
 
     async delete(id: string): Promise<void> {
         await this.knex('loans').where({ id }).del();
+    }
+}
+
+export class PostgresArtisticQuestionRepository implements IArtisticQuestionRepository {
+    constructor(private knex: Knex) {}
+
+    async findByUserId(userId: string): Promise<ArtisticQuestion[]> {
+        return this.knex('artistic_questions').where({ userId }).orderBy('createdAt', 'desc');
+    }
+
+    async findById(id: string, userId: string): Promise<ArtisticQuestion | undefined> {
+        return this.knex('artistic_questions').where({ id, userId }).first();
+    }
+
+    async create(question: ArtisticQuestion): Promise<void> {
+        await this.knex('artistic_questions').insert(question);
+    }
+
+    async update(question: ArtisticQuestion): Promise<void> {
+        await this.knex('artistic_questions').where({ id: question.id, userId: question.userId }).update(question);
+    }
+
+    async delete(id: string, userId: string): Promise<void> {
+        await this.knex('artistic_questions').where({ id, userId }).del();
     }
 }

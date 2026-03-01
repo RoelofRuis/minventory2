@@ -45,6 +45,15 @@ export interface Category {
     updatedAt: Date;
 }
 
+export interface ArtisticQuestion {
+    id: string;
+    userId: string;
+    question: Buffer; // Encrypted Buffer
+    answer: Buffer; // Encrypted Buffer
+    createdAt: Date;
+    updatedAt: Date;
+}
+
 export interface ItemCategory {
     itemId: string;
     categoryId: string;

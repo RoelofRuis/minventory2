@@ -1,12 +1,13 @@
 import express from 'express';
 import dotenv from 'dotenv';
 import knex from 'knex';
-import { PostgresUserRepository, PostgresItemRepository, PostgresCategoryRepository, PostgresQuantityTransactionRepository, PostgresLoanRepository } from './repositories/postgres.js';
-import { InMemoryUserRepository, InMemoryItemRepository, InMemoryCategoryRepository, InMemoryQuantityTransactionRepository, InMemoryLoanRepository } from './repositories/inMemory.js';
+import { PostgresUserRepository, PostgresItemRepository, PostgresCategoryRepository, PostgresQuantityTransactionRepository, PostgresLoanRepository, PostgresArtisticQuestionRepository } from './repositories/postgres.js';
+import { InMemoryUserRepository, InMemoryItemRepository, InMemoryCategoryRepository, InMemoryQuantityTransactionRepository, InMemoryLoanRepository, InMemoryArtisticQuestionRepository } from './repositories/inMemory.js';
 import { AuthService } from './services/auth.js';
 import { ItemService } from './services/items.js';
 import { CategoryService } from './services/categories.js';
 import { LoanService } from './services/loans.js';
+import { ArtisticQuestionService } from './services/artisticQuestions.js';
 import { authMiddleware, AuthRequest } from './middleware/auth.js';
 import { encryptionMiddleware, EncryptionRequest } from './middleware/encryption.js';
 import { deriveKey } from './services/encryption.js';
@@ -35,7 +36,7 @@ dotenv.config();
 
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { categories as fixtureCategories, subCategories as fixtureSubCategories, items as fixtureItems, generatePlaceholderImage } from './fixtures.js';
+import { categories as fixtureCategories, subCategories as fixtureSubCategories, items as fixtureItems, artisticQuestions as fixtureQuestions, generatePlaceholderImage } from './fixtures.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -128,6 +129,7 @@ let authService: AuthService;
 let itemService: ItemService;
 let categoryService: CategoryService;
 let loanService: LoanService;
+let artisticQuestionService: ArtisticQuestionService;
 
 async function initDB() {
     if (usePostgres) {
@@ -154,12 +156,16 @@ async function initDB() {
         categoryRepository = new PostgresCategoryRepository(db);
         transactionRepository = new PostgresQuantityTransactionRepository(db);
         loanRepository = new PostgresLoanRepository(db);
+        const artisticQuestionRepository = new PostgresArtisticQuestionRepository(db);
+        artisticQuestionService = new ArtisticQuestionService(artisticQuestionRepository);
     } else {
         userRepository = new InMemoryUserRepository();
         itemRepository = new InMemoryItemRepository();
         categoryRepository = new InMemoryCategoryRepository();
         transactionRepository = new InMemoryQuantityTransactionRepository();
         loanRepository = new InMemoryLoanRepository();
+        const artisticQuestionRepository = new InMemoryArtisticQuestionRepository();
+        artisticQuestionService = new ArtisticQuestionService(artisticQuestionRepository);
     }
 
     authService = new AuthService(userRepository);
@@ -224,6 +230,10 @@ async function initDB() {
                         quantity: itemInfo.quantity
                     });
                 }
+            }
+
+            for (const q of fixtureQuestions) {
+                await artisticQuestionService.createQuestion(user.id, key, q.question, q.answer);
             }
             console.log('In-memory seeding complete.');
         }
@@ -521,6 +531,48 @@ app.delete('/api/loans/:id', authMiddleware, async (req: AuthRequest, res) => {
     try {
         await loanService.deleteLoan(req.user!.id, req.params.id as string);
         res.json({ message: 'Loan deleted' });
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Artistic Question routes
+app.get('/api/artistic-questions', authMiddleware, encryptionMiddleware, async (req: any, res) => {
+    try {
+        const ereq = req as EncryptionRequest;
+        const questions = await artisticQuestionService.getQuestions(ereq.user!.id, ereq.encryptionKey);
+        res.json(questions);
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/artistic-questions', authMiddleware, encryptionMiddleware, async (req: any, res) => {
+    try {
+        const ereq = req as EncryptionRequest;
+        const { question, answer } = ereq.body;
+        const id = await artisticQuestionService.createQuestion(ereq.user!.id, ereq.encryptionKey, question, answer);
+        res.status(201).json({ id, message: 'Question created' });
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.put('/api/artistic-questions/:id', authMiddleware, encryptionMiddleware, async (req: any, res) => {
+    try {
+        const ereq = req as EncryptionRequest;
+        const { question, answer } = ereq.body;
+        await artisticQuestionService.updateQuestion(ereq.user!.id, ereq.encryptionKey, ereq.params.id, question, answer);
+        res.json({ message: 'Question updated' });
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.delete('/api/artistic-questions/:id', authMiddleware, async (req: AuthRequest, res) => {
+    try {
+        await artisticQuestionService.deleteQuestion(req.user!.id, req.params.id);
+        res.json({ message: 'Question deleted' });
     } catch (err: any) {
         res.status(500).json({ error: err.message });
     }

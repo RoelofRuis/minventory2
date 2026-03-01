@@ -1,4 +1,4 @@
-import { User, Item, Category, QuantityTransaction, Loan } from '../models/types.js';
+import { User, Item, Category, QuantityTransaction, Loan, ArtisticQuestion } from '../models/types.js';
 
 export interface IUserRepository {
     findByUsername(username: string): Promise<User | undefined>;
@@ -40,4 +40,12 @@ export interface ILoanRepository {
     create(loan: Loan): Promise<void>;
     update(loan: Loan): Promise<void>;
     delete(id: string): Promise<void>;
+}
+
+export interface IArtisticQuestionRepository {
+    findByUserId(userId: string): Promise<ArtisticQuestion[]>;
+    findById(id: string, userId: string): Promise<ArtisticQuestion | undefined>;
+    create(question: ArtisticQuestion): Promise<void>;
+    update(question: ArtisticQuestion): Promise<void>;
+    delete(id: string, userId: string): Promise<void>;
 }

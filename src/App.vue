@@ -9,6 +9,10 @@
       </router-link>
     </div>
     <div v-if="authStore.isAuthenticated" style="margin-top: 8px; display: flex; align-items: center; justify-content: center; gap: 10px;">
+      <router-link to="/artistic" class="btn-secondary btn-small" style="width: auto; white-space: nowrap;" title="Artistic Questions">
+        <HelpCircle :size="16" style="vertical-align: middle; margin-right: 4px;" />
+        Questions
+      </router-link>
       <button class="btn-secondary btn-small" style="width: auto; white-space: nowrap;" @click="showSettingsModal = true">
         <Settings :size="16" style="vertical-align: middle; margin-right: 4px;" />
         Settings
@@ -136,7 +140,7 @@
 import { computed, ref, nextTick, watch, onUnmounted } from 'vue';
 import { useAuthStore } from './stores/auth';
 import { useRoute } from 'vue-router';
-import { Rocket, Box, Eye, EyeOff, X, Settings, LogOut, Terminal, Trash2, Pencil } from 'lucide-vue-next';
+import { Rocket, Box, Eye, EyeOff, X, Settings, LogOut, Terminal, Trash2, Pencil, HelpCircle } from 'lucide-vue-next';
 import axios from 'axios';
 import { logs, clearLogs } from './utils/logger';
 

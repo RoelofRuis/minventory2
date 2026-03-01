@@ -119,6 +119,17 @@ export const items = [
     { name: 'Tax Documents 2023', categories: ['Secret Documents'], quantity: 1, usageFrequency: 'yearly', attachment: 'some', intention: 'keep', joy: 'low' }
 ];
 
+export const artisticQuestions = [
+    {
+        question: 'Why do we own stuff?',
+        answer: 'Ownership is often a way to extend our identity into the physical world. We surround ourselves with things that reflect who we are, or who we want to be. But it can also become a burden, a set of anchors that keep us from moving freely.'
+    },
+    {
+        question: 'What does it mean to "own" something?',
+        answer: 'Is it just a legal title? Or is it the relationship we have with the object? True ownership might be about the care we give to something. If we don\'t use it or care for it, do we really own it, or is it just occupying space in our lives?'
+    }
+];
+
 export async function generatePlaceholderImage(name) {
     const colors = [
         '#f87171', '#fb923c', '#fbbf24', '#facc15', '#a3e635', '#4ade80', '#34d399', '#2dd4bf', 

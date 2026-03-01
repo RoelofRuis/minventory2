@@ -6,7 +6,7 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { getDbConfig } from './db-config.js';
-import { categories as fixtureCategories, subCategories as fixtureSubCategories, items as fixtureItems, generatePlaceholderImage } from './fixtures.js';
+import { categories as fixtureCategories, subCategories as fixtureSubCategories, items as fixtureItems, artisticQuestions as fixtureQuestions, generatePlaceholderImage } from './fixtures.js';
 
 dotenv.config();
 
@@ -69,6 +69,7 @@ async function seed() {
         await db('quantity_transactions').del();
         await db('item_categories').del();
         await db('items').del();
+        await db('artistic_questions').del();
         // Clear parentId references first to avoid issues with self-referential foreign keys
         await db('categories').update({ parentId: null });
         await db('categories').del();
@@ -195,6 +196,18 @@ async function seed() {
                     updatedAt: new Date()
                 });
             }
+        }
+
+        console.log('Adding artistic questions...');
+        for (const q of fixtureQuestions) {
+            await db('artistic_questions').insert({
+                id: ulid(),
+                userId,
+                question: encrypt(q.question, key),
+                answer: encrypt(q.answer, key),
+                createdAt: new Date(),
+                updatedAt: new Date()
+            });
         }
 
         console.log('Seeding completed successfully!');

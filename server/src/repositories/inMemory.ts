@@ -1,5 +1,5 @@
-import { User, Item, Category, QuantityTransaction, Loan, ItemCategory } from '../models/types.js';
-import { IUserRepository, IItemRepository, ICategoryRepository, IQuantityTransactionRepository, ILoanRepository } from './interfaces.js';
+import { User, Item, Category, QuantityTransaction, Loan, ItemCategory, ArtisticQuestion } from '../models/types.js';
+import { IUserRepository, IItemRepository, ICategoryRepository, IQuantityTransactionRepository, ILoanRepository, IArtisticQuestionRepository } from './interfaces.js';
 
 export class InMemoryUserRepository implements IUserRepository {
     private users: Map<string, User> = new Map();
@@ -150,5 +150,32 @@ export class InMemoryLoanRepository implements ILoanRepository {
 
     async delete(id: string): Promise<void> {
         this.loans = this.loans.filter(l => l.id !== id);
+    }
+}
+
+export class InMemoryArtisticQuestionRepository implements IArtisticQuestionRepository {
+    private questions: ArtisticQuestion[] = [];
+
+    async findByUserId(userId: string): Promise<ArtisticQuestion[]> {
+        return this.questions.filter(q => q.userId === userId).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    }
+
+    async findById(id: string, userId: string): Promise<ArtisticQuestion | undefined> {
+        return this.questions.find(q => q.id === id && q.userId === userId);
+    }
+
+    async create(question: ArtisticQuestion): Promise<void> {
+        this.questions.push(question);
+    }
+
+    async update(question: ArtisticQuestion): Promise<void> {
+        const index = this.questions.findIndex(q => q.id === question.id && q.userId === question.userId);
+        if (index !== -1) {
+            this.questions[index] = question;
+        }
+    }
+
+    async delete(id: string, userId: string): Promise<void> {
+        this.questions = this.questions.filter(q => !(q.id === id && q.userId === userId));
     }
 }

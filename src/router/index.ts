@@ -3,6 +3,7 @@ import Dashboard from '../components/Dashboard.vue';
 import Login from '../components/Login.vue';
 import TwoFactor from '../components/TwoFactor.vue';
 import ItemCloud3D from '../components/ItemCloud3D.vue';
+import ArtisticQuestions from '../components/ArtisticQuestions.vue';
 import { useAuthStore } from '../stores/auth';
 
 const routes = [
@@ -10,7 +11,8 @@ const routes = [
   { path: '/login', component: Login },
   { path: '/logout', redirect: '/login' },
   { path: '/verify-2fa', component: TwoFactor, meta: { requiresAuth: true } },
-  { path: '/cloud', component: ItemCloud3D, meta: { requiresAuth: true } }
+  { path: '/cloud', component: ItemCloud3D, meta: { requiresAuth: true } },
+  { path: '/artistic', component: ArtisticQuestions, meta: { requiresAuth: true } }
 ];
 
 const router = createRouter({
