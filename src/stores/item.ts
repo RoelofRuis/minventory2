@@ -23,7 +23,6 @@ export function useItemStore() {
     searchQuery
   } = filter();
 
-
   const fetchItems = async (force = false) => {
     if (items.value.length > 0 && !force) return;
     loading.value = true;
