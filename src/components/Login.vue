@@ -38,11 +38,10 @@ const handleSubmit = async () => {
   try {
     const res = await axios.post('/api/auth/login', { username: username.value, password: password.value });
     
-    // Reset settings for the new user session
+    // Reset settings.ts for the new user session
     localStorage.clear();
-    authStore.editMode = false;
-    authStore.showPrivate = false;
-    authStore.gridColumns = 3;
+    authStore.editMode.value = false;
+    authStore.showPrivate.value = false;
 
     await authStore.checkAuth();
     

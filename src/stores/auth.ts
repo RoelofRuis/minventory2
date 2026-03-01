@@ -1,69 +1,75 @@
-import { defineStore } from 'pinia';
 import axios from 'axios';
+import {computed, ref} from "vue";
+import {getLocalStorageItem} from "../utils/localstorage.ts";
 
-export const useAuthStore = defineStore('auth', {
-    state: () => ({
-        user: null as any,
-        showPrivate: localStorage.getItem('showPrivate') === 'true',
-        editMode: localStorage.getItem('editMode') === 'true',
-        gridColumns: Math.min(Math.max(Number(localStorage.getItem('gridColumns')) || 3, 1), 5)
-    }),
-    getters: {
-        isAuthenticated: (state) => !!state.user
-    },
-    actions: {
-        async checkAuth() {
-            try {
-                const res = await axios.get('/api/auth/me');
-                this.user = res.data;
-                // Sync private mode from backend session
-                this.showPrivate = !!res.data.privateUnlocked;
-                localStorage.setItem('showPrivate', String(this.showPrivate));
-            } catch (err: any) {
-                this.user = null;
-                // If not authenticated, clear session-based settings
-                if (err.response?.status === 401) {
-                    this.showPrivate = false;
-                    this.editMode = false;
-                    this.gridColumns = 3;
-                    localStorage.clear();
-                }
+const user = ref<any>(null);
+const showPrivate = ref<boolean>(getLocalStorageItem('showPrivate', false));
+const editMode = ref<boolean>(getLocalStorageItem('editMode', false));
+
+export function useAuthStore() {
+    const isAuthenticated = computed(() => !!user.value);
+    const is2FAVerified = computed(() => user.value?.is2FAVerified ?? false);
+
+    const checkAuth = async () => {
+        try {
+            const res = await axios.get('/api/auth/me');
+            user.value = res.data;
+            // Sync private mode from backend session
+            showPrivate.value = !!res.data.privateUnlocked;
+            localStorage.setItem('showPrivate', String(showPrivate.value));
+        } catch (err: any) {
+            user.value = null;
+            // If not authenticated, clear session-based settings.ts
+            if (err.response?.status === 401) {
+                showPrivate.value = false;
+                editMode.value = false;
+                localStorage.clear();
             }
-        },
-        async logout() {
-            try {
-                await axios.post('/api/auth/logout');
-            } catch (err) {
-                console.error('Logout failed', err);
-            }
-            this.user = null;
-            this.showPrivate = false;
-            this.editMode = false;
-            this.gridColumns = 3;
-            localStorage.clear();
-            window.location.href = '/login';
-        },
-        async togglePrivate(val: boolean) {
-            this.showPrivate = val;
-            localStorage.setItem('showPrivate', String(val));
-            if (!val) {
-                try {
-                    await axios.post('/api/auth/lock-private');
-                } catch (err) {
-                    console.error('Failed to lock private items on backend', err);
-                }
-            }
-        },
-        async setEditMode(val: boolean) {
-            this.editMode = val;
-            localStorage.setItem('editMode', String(val));
-            // Enabling edit mode enables private view by default; disabling turns it off
-            await this.togglePrivate(val);
-        },
-        setGridColumns(cols: number) {
-            const cappedCols = Math.min(Math.max(cols, 1), 5);
-            this.gridColumns = cappedCols;
-            localStorage.setItem('gridColumns', String(cappedCols));
         }
-    }
-});
+    };
+
+    const logout = async () => {
+        try {
+            await axios.post('/api/auth/logout');
+        } catch (err) {
+            console.error('Logout failed', err);
+        }
+        user.value = null;
+        showPrivate.value = false;
+        editMode.value = false;
+        localStorage.clear();
+        window.location.href = '/login';
+    };
+
+    const togglePrivate = async (val: boolean) => {
+        showPrivate.value = val;
+        localStorage.setItem('showPrivate', String(val));
+        if (!val) {
+            try {
+                await axios.post('/api/auth/lock-private');
+            } catch (err) {
+                console.error('Failed to lock private items on backend', err);
+            }
+        }
+    };
+
+    const setEditMode = async (val: boolean) => {
+        editMode.value = val;
+        localStorage.setItem('editMode', String(val));
+        // Enabling edit mode enables private view by default; disabling turns it off
+        await togglePrivate(val);
+    };
+
+
+    return {
+        user,
+        showPrivate,
+        editMode,
+        isAuthenticated,
+        is2FAVerified,
+        checkAuth,
+        logout,
+        togglePrivate,
+        setEditMode,
+    };
+}

@@ -1,29 +1,28 @@
-import { defineStore, storeToRefs } from 'pinia';
 import { ref, computed, watch } from 'vue';
 import axios from 'axios';
 import { useAuthStore } from './auth';
 import { useCategoryStore } from './category';
-import {useFilters} from "../composables/useFilters.ts";
+import {filter} from "./filter.ts";
 
 const imageUrlCache = new Map<string, string>();
 
-export const useItemStore = defineStore('item', () => {
+const items = ref<any[]>([]);
+const loading = ref(false);
+
+export function useItemStore() {
   const authStore = useAuthStore();
-  const categoryStore = useCategoryStore();
-  
-  const { categories } = storeToRefs(categoryStore);
-  const { 
-    selectedCategoryIds, 
-    mode: filterMode, 
-    selectedJoys, 
-    selectedFrequencies, 
-    selectedIntentions, 
+
+  const { categories } = useCategoryStore();
+  const {
+    selectedCategoryIds,
+    mode: filterMode,
+    selectedJoys,
+    selectedFrequencies,
+    selectedIntentions,
     selectedAttachments,
     searchQuery
-  } = useFilters();
+  } = filter();
 
-  const items = ref<any[]>([]);
-  const loading = ref(false);
 
   const fetchItems = async (force = false) => {
     if (items.value.length > 0 && !force) return;
@@ -178,4 +177,4 @@ export const useItemStore = defineStore('item', () => {
     totalIndividualItems,
     getDescendantIds
   };
-});
+}

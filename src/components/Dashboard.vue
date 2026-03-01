@@ -2,8 +2,6 @@
 import {ref, onMounted, onUnmounted, computed, nextTick, watch} from 'vue';
 import axios from 'axios';
 import {useAuthStore} from '../stores/auth';
-import {useCategories} from '../composables/useCategories';
-import {useItems} from '../composables/useItems';
 import {formatStat, isDefined, getStatColor} from '../utils/formatters';
 import {usageFrequencies, attachments, intentions, joys} from '../utils/constants';
 import {
@@ -16,10 +14,14 @@ import {preload} from '@imgly/background-removal';
 import {downscaleImage} from '../utils/imageProcessor';
 import BackgroundRemovalWorker from '../workers/background-removal.worker?worker';
 import ItemsTab from "./dashboard/ItemsTab.vue";
+import {useItemStore} from "../stores/item.ts";
+import {useCategoryStore} from "../stores/category.ts";
+import {useSettings} from "../stores/settings.ts";
 
 const authStore = useAuthStore();
-const {categories, visibleCategories, fetchCategories, getCategoryName, getCategoryColor} = useCategories();
-const {items, fetchItems} = useItems();
+const { gridColumns } = useSettings();
+const {categories, visibleCategories, fetchCategories, getCategoryName, getCategoryColor} = useCategoryStore();
+const {items, fetchItems} = useItemStore();
 
 const saving = ref(false);
 
@@ -737,7 +739,7 @@ onUnmounted(() => {
 });
 </script>
 <template>
-  <div class="container" :style="{ '--grid-columns': authStore.gridColumns }">
+  <div class="container" :style="{ '--grid-columns': gridColumns }">
     <!-- Tabs -->
     <div class="tabs">
       <button :class="{ active: currentTab === 'items' }" @click="currentTab = 'items'">

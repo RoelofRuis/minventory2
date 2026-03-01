@@ -3,28 +3,28 @@
 import {formatStat, getStatColor, isDefined} from "../../utils/formatters.ts";
 import FilterBar from "../FilterBar.vue";
 import {Gift, Heart, Lock, Package, Smile, Target, Users, Zap} from "lucide-vue-next";
-import {useItems} from "../../composables/useItems.ts";
-import {useCategories} from "../../composables/useCategories.ts";
-import {useFilters} from "../../composables/useFilters.ts";
+import {filter} from "../../stores/filter.ts";
+import {useItemStore} from "../../stores/item.ts";
+import {useCategoryStore} from "../../stores/category.ts";
 
 defineEmits<{
   (e: 'item-selected', itemId: any): void;
 }>()
 
-const {toggleSelectedCategoryId} = useFilters();
+const {toggleSelectedCategoryId} = filter();
 
 const {
   items,
   loading,
   filteredItems,
   totalIndividualItems
-} = useItems();
+} = useItemStore();
 
 const {
   visibleCategories,
   getCategoryColor,
   getCategoryName,
-} = useCategories();
+} = useCategoryStore();
 </script>
 
 <template>

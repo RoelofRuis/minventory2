@@ -1,11 +1,10 @@
-import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import axios from 'axios';
 
-export const useArtisticQuestionStore = defineStore('artisticQuestion', () => {
-  const questions = ref<any[]>([]);
-  const loading = ref(false);
+const questions = ref<any[]>([]);
+const loading = ref(false);
 
+export function useArtisticQuestionStore() {
   const fetchQuestions = async () => {
     loading.value = true;
     try {
@@ -56,4 +55,4 @@ export const useArtisticQuestionStore = defineStore('artisticQuestion', () => {
     updateQuestion,
     deleteQuestion
   };
-});
+}

@@ -3,7 +3,7 @@ import { Smile, Zap, Target, Heart, X } from 'lucide-vue-next';
 import CategoryFilter from './CategoryFilter.vue';
 import StatFilter from './StatFilter.vue';
 import { usageFrequencies, attachments, intentions, joys } from '../utils/constants';
-import {useFilters} from "../composables/useFilters.ts";
+import {filter} from "../stores/filter.ts";
 
 defineProps<{
   categories: any[];
@@ -18,7 +18,7 @@ const {
   selectedIntentions,
   selectedAttachments,
   searchQuery
-} = useFilters();
+} = filter();
 </script>
 
 
