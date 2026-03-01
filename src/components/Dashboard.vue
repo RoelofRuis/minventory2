@@ -860,7 +860,7 @@ const { categories, fetchCategories, getCategoryName, getCategoryColor } = useCa
 const { 
   items, loading, selectedCategoryIds,
   fetchItems, filteredItems, totalIndividualItems
-} = useItems(categories);
+} = useItems();
 
 const saving = ref(false);
 

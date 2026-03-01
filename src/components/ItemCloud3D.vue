@@ -72,7 +72,7 @@ const visibleCategories = computed(() => authStore.showPrivate ? categories.valu
 const { 
   items, loading, 
   fetchItems, fetchObjectUrl, filteredItems, totalIndividualItems
-} = useItems(categories);
+} = useItems();
 
 const container = ref<HTMLElement | null>(null);
 const selectedItem = ref<any>(null);

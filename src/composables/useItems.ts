@@ -2,7 +2,7 @@ import { storeToRefs } from 'pinia';
 import { useItemStore } from '../stores/item';
 import { useFilterStore } from '../stores/filter';
 
-export function useItems(categories: any) {
+export function useItems() {
   const store = useItemStore();
   const filterStore = useFilterStore();
   
