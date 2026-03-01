@@ -10,9 +10,9 @@ import { formatStat, isDefined, getStatColor } from '../utils/formatters';
 import {useItemStore} from "../stores/item.ts";
 import {useCategoryStore} from "../stores/category.ts";
 
-const authStore = useAuthStore();
+const { showPrivate } = useAuthStore();
 const { categories, fetchCategories, getCategoryName, getCategoryColor } = useCategoryStore();
-const visibleCategories = computed(() => authStore.showPrivate ? categories.value : categories.value.filter(c => !c.private));
+const visibleCategories = computed(() => showPrivate ? categories.value : categories.value.filter(c => !c.private));
 const {
   items,
   loading,
@@ -55,7 +55,7 @@ watch(items, () => {
   rebuildCloud();
 });
 
-watch(() => authStore.showPrivate, async (val) => {
+watch(() => showPrivate, async (val) => {
   if (val) {
     loading.value = true;
     await fetchData(true);

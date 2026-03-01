@@ -10,7 +10,7 @@ const items = ref<any[]>([]);
 const loading = ref(false);
 
 export function useItemStore() {
-  const authStore = useAuthStore();
+  const {showPrivate} = useAuthStore();
 
   const { categories } = useCategoryStore();
   const {
@@ -48,7 +48,7 @@ export function useItemStore() {
       }));
 
       // When private mode is off, proactively remove private items from memory
-      if (!authStore.showPrivate) {
+      if (!showPrivate) {
         items.value = items.value.filter((i: any) => !i.private);
       }
     } catch (err) {
@@ -72,7 +72,7 @@ export function useItemStore() {
     }
   };
 
-  watch(() => authStore.showPrivate, (val) => {
+  watch(() => showPrivate, (val) => {
     if (!val) {
       // Clear all object URLs to be safe when hiding private items
       imageUrlCache.forEach((objUrl) => {
@@ -107,7 +107,7 @@ export function useItemStore() {
   const filteredItems = computed(() => {
     let result = items.value;
     
-    if (!authStore.showPrivate) {
+    if (!showPrivate) {
       result = result.filter(i => !i.private);
     }
     

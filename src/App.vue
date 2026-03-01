@@ -8,7 +8,8 @@ import axios from 'axios';
 import { logs, clearLogs } from './utils/logger';
 import {useSettings} from "./stores/settings.ts";
 
-const authStore = useAuthStore();
+const { user, showPrivate, editMode, isAuthenticated, setEditMode, togglePrivate, logoutSession } = useAuthStore();
+console.log(user)
 const { gridColumns, setGridColumns } = useSettings();
 const route = useRoute();
 
@@ -32,7 +33,7 @@ const getLogColor = (type: string) => {
 };
 
 const logout = async () => {
-  await authStore.logout();
+  await logoutSession();
 };
 
 const closeUnlockModal = () => {
@@ -41,7 +42,7 @@ const closeUnlockModal = () => {
 };
 
 const togglePrivateItems = async () => {
-  if (!authStore.showPrivate) {
+  if (!showPrivate) {
     unlockPassword.value = '';
     unlockError.value = '';
     showUnlockModal.value = true;
@@ -49,12 +50,12 @@ const togglePrivateItems = async () => {
       unlockPasswordInput.value?.focus();
     });
   } else {
-    await authStore.togglePrivate(false);
+    await togglePrivate(false);
   }
 };
 
 const openPrivateFromSettings = async () => {
-  if (!authStore.showPrivate) {
+  if (!showPrivate) {
     showSettingsModal.value = false;
     await nextTick();
   }
@@ -62,19 +63,19 @@ const openPrivateFromSettings = async () => {
 };
 
 const toggleEditModeFromSettings = async () => {
-  if (!authStore.editMode) {
+  if (!editMode) {
     // Enabling edit mode should also enable private view. Prompt unlock if needed.
-    if (!authStore.showPrivate) {
+    if (!showPrivate) {
       pendingEnableEdit.value = true;
       showSettingsModal.value = false;
       await nextTick();
       await togglePrivateItems();
     } else {
-      await authStore.setEditMode(true);
+      await setEditMode(true);
     }
   } else {
     // Disabling edit also disables private
-    await authStore.setEditMode(false);
+    await setEditMode(false);
   }
 };
 
@@ -85,9 +86,9 @@ const confirmUnlock = async () => {
   unlockError.value = '';
   try {
     await axios.post('/api/auth/unlock-private', { password: unlockPassword.value });
-    await authStore.togglePrivate(true);
+    await togglePrivate(true);
     if (pendingEnableEdit.value) {
-      await authStore.setEditMode(true);
+      await setEditMode(true);
     }
     closeUnlockModal();
   } catch (err) {
@@ -126,12 +127,12 @@ onUnmounted(() => {
     <div style="display: flex; align-items: center; justify-content: center; gap: 15px;">
       <h1 class="app-title">Minventory</h1>
 
-      <router-link v-if="authStore.isAuthenticated" :to="viewToggleLink" class="icon-btn" :title="viewToggleTitle">
+      <router-link v-if="isAuthenticated" :to="viewToggleLink" class="icon-btn" :title="viewToggleTitle">
         <Rocket v-if="route.path !== '/cloud'" :size="28" />
         <Box v-else :size="28" />
       </router-link>
     </div>
-    <div v-if="authStore.isAuthenticated" style="margin-top: 8px; display: flex; align-items: center; justify-content: center; gap: 10px;">
+    <div v-if="isAuthenticated" style="margin-top: 8px; display: flex; align-items: center; justify-content: center; gap: 10px;">
       <router-link to="/artistic" class="btn-secondary btn-small" style="width: auto; white-space: nowrap;" title="Artistic Questions">
         <HelpCircle :size="16" style="vertical-align: middle; margin-right: 4px;" />
         Questions
@@ -140,10 +141,10 @@ onUnmounted(() => {
         <Settings :size="16" style="vertical-align: middle; margin-right: 4px;" />
         Settings
       </button>
-      <div v-if="authStore.showPrivate" title="Private mode active (Status Indicator)" style="display: flex; align-items: center;">
+      <div v-if="showPrivate" title="Private mode active (Status Indicator)" style="display: flex; align-items: center;">
         <Eye :size="18" style="color: var(--accent-purple); opacity: 0.9;" />
       </div>
-      <div v-if="authStore.editMode" title="Edit mode enabled (Status Indicator)" style="display: flex; align-items: center;">
+      <div v-if="editMode" title="Edit mode enabled (Status Indicator)" style="display: flex; align-items: center;">
         <Pencil :size="18" style="color: var(--accent-purple); opacity: 0.9;" />
       </div>
     </div>
@@ -161,12 +162,12 @@ onUnmounted(() => {
         <div style="display: flex; align-items: center; gap: 12px;">
           <div>
             <label class="silver-text" style="font-weight: 600;">Private Items</label>
-            <div class="silver-text" style="font-size: 12px;">{{ authStore.showPrivate ? 'Currently visible' : 'Currently hidden' }}</div>
+            <div class="silver-text" style="font-size: 12px;">{{ showPrivate ? 'Currently visible' : 'Currently hidden' }}</div>
           </div>
-          <component :is="authStore.showPrivate ? Eye : EyeOff" :size="20" style="color: var(--accent-purple); flex-shrink: 0;" title="Status Indicator" />
+          <component :is="showPrivate ? Eye : EyeOff" :size="20" style="color: var(--accent-purple); flex-shrink: 0;" title="Status Indicator" />
         </div>
         <button class="btn-secondary btn-small" style="width: auto; white-space: nowrap;" @click="openPrivateFromSettings">
-          {{ authStore.showPrivate ? 'Hide Private' : 'Show Private' }}
+          {{ showPrivate ? 'Hide Private' : 'Show Private' }}
         </button>
       </div>
 
@@ -174,12 +175,12 @@ onUnmounted(() => {
         <div style="display: flex; align-items: center; gap: 12px;">
           <div>
             <label class="silver-text" style="font-weight: 600;">Edit Mode</label>
-            <div class="silver-text" style="font-size: 12px;">{{ authStore.editMode ? 'Enabled (private visible)' : 'Disabled' }}</div>
+            <div class="silver-text" style="font-size: 12px;">{{ editMode ? 'Enabled (private visible)' : 'Disabled' }}</div>
           </div>
-          <Settings v-if="authStore.editMode" :size="20" style="color: var(--accent-purple); flex-shrink: 0;" title="Status Indicator" />
+          <Settings v-if="editMode" :size="20" style="color: var(--accent-purple); flex-shrink: 0;" title="Status Indicator" />
         </div>
         <button class="btn-secondary btn-small" style="width: auto; white-space: nowrap;" @click="toggleEditModeFromSettings">
-          {{ authStore.editMode ? 'Disable Edit' : 'Enable Edit' }}
+          {{ editMode ? 'Disable Edit' : 'Enable Edit' }}
         </button>
       </div>
 

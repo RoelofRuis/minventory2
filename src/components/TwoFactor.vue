@@ -1,3 +1,33 @@
+<script setup lang="ts">
+import { ref } from 'vue';
+import axios from 'axios';
+import { useAuthStore } from '../stores/auth';
+import { useRouter } from 'vue-router';
+
+const { checkAuth } = useAuthStore();
+const router = useRouter();
+
+const token = ref('');
+const loading = ref(false);
+const error = ref('');
+
+const verifyToken = async () => {
+  if (token.value.length !== 6) return;
+
+  loading.value = true;
+  error.value = '';
+  try {
+    await axios.post('/api/auth/verify-2fa', { token: token.value });
+    await checkAuth();
+    router.push('/').catch(() => {});
+  } catch (err: any) {
+    error.value = 'Invalid code. Try again.';
+  } finally {
+    loading.value = false;
+  }
+};
+</script>
+
 <template>
   <div class="auth-container">
     <div class="card" style="text-align: center;">
@@ -26,33 +56,3 @@
     </div>
   </div>
 </template>
-
-<script setup lang="ts">
-import { ref } from 'vue';
-import axios from 'axios';
-import { useAuthStore } from '../stores/auth';
-import { useRouter } from 'vue-router';
-
-const authStore = useAuthStore();
-const router = useRouter();
-
-const token = ref('');
-const loading = ref(false);
-const error = ref('');
-
-const verifyToken = async () => {
-  if (token.value.length !== 6) return;
-  
-  loading.value = true;
-  error.value = '';
-  try {
-    await axios.post('/api/auth/verify-2fa', { token: token.value });
-    await authStore.checkAuth();
-    router.push('/').catch(() => {});
-  } catch (err: any) {
-    error.value = 'Invalid code. Try again.';
-  } finally {
-    loading.value = false;
-  }
-};
-</script>

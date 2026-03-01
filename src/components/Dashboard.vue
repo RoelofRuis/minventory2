@@ -18,7 +18,7 @@ import {useItemStore} from "../stores/item.ts";
 import {useCategoryStore} from "../stores/category.ts";
 import {useSettings} from "../stores/settings.ts";
 
-const authStore = useAuthStore();
+const { showPrivate, editMode } = useAuthStore();
 const { gridColumns } = useSettings();
 const {categories, visibleCategories, fetchCategories, getCategoryName, getCategoryColor} = useCategoryStore();
 const {items, fetchItems} = useItemStore();
@@ -144,7 +144,7 @@ const preloadBackgroundRemoval = () => {
   });
 };
 
-watch(() => authStore.editMode, (isEdit) => {
+watch(() => editMode, (isEdit) => {
   if (isEdit) {
     preloadBackgroundRemoval();
     initWorker();
@@ -205,7 +205,7 @@ const filteredCategories = computed(() => {
 
 const sortedCategories = computed(() => {
   let cats = categories.value;
-  if (!authStore.showPrivate) {
+  if (!showPrivate) {
     cats = cats.filter(c => !c.private);
   }
 
@@ -232,7 +232,7 @@ const sortedCategories = computed(() => {
   return result;
 });
 
-watch(() => authStore.showPrivate, () => {
+watch(() => showPrivate, () => {
   fetchData(true);
 });
 
@@ -250,7 +250,7 @@ const fetchData = async (force = false) => {
 // Item Actions
 // Deprecated
 const openItemModal = (item: any = null, keepImage = false) => {
-  if (!authStore.editMode) return;
+  if (!editMode) return;
   editingItem.value = item;
   if (!keepImage) {
     file.value = null;
@@ -478,7 +478,7 @@ const toggleCategory = (catId: string) => {
 };
 
 const saveItem = async (stay = false) => {
-  if (!authStore.editMode) return;
+  if (!editMode) return;
   saving.value = true;
   try {
     const formData = new FormData();
@@ -542,7 +542,7 @@ const viewItemDetails = async (itemId: any) => {
   try {
     const res = await axios.get(`/api/items/${itemId}`);
     selectedItem.value = res.data;
-    if (authStore.editMode) {
+    if (editMode) {
       openItemModal(res.data);
     } else {
       modalView.value = 'detail';
@@ -554,7 +554,7 @@ const viewItemDetails = async (itemId: any) => {
 };
 
 const confirmDeleteItem = async (id: string) => {
-  if (!authStore.editMode) return;
+  if (!editMode) return;
   if (confirm('Are you sure you want to delete this item?')) {
     try {
       await axios.delete(`/api/items/${id}`);
@@ -567,7 +567,7 @@ const confirmDeleteItem = async (id: string) => {
 
 // Category Actions
 const openCategoryModal = (cat: any = null) => {
-  if (!authStore.editMode) return;
+  if (!editMode) return;
   editingCategory.value = cat;
   if (cat) {
     categoryForm.value = {
@@ -592,7 +592,7 @@ const openCategoryModal = (cat: any = null) => {
 };
 
 const saveCategory = async () => {
-  if (!authStore.editMode) return;
+  if (!editMode) return;
   saving.value = true;
   try {
     if (editingCategory.value) {
@@ -610,7 +610,7 @@ const saveCategory = async () => {
 };
 
 const deleteCategory = async (id: string) => {
-  if (!authStore.editMode) return;
+  if (!editMode) return;
   if (confirm('Are you sure? This will remove the category from all items.')) {
     try {
       await axios.delete(`/api/categories/${id}`);
@@ -629,7 +629,7 @@ const onParentCategoryChange = () => {
 
 // Transaction Actions
 const openTransactionModal = async (item: any) => {
-  if (!authStore.editMode) return;
+  if (!editMode) return;
   selectedItem.value = item;
   transactionForm.value = {delta: 0, note: '', reason: undefined};
 
@@ -648,7 +648,7 @@ const openTransactionModal = async (item: any) => {
 };
 
 const saveTransaction = async () => {
-  if (!authStore.editMode) return;
+  if (!editMode) return;
   if (transactionForm.value.delta === 0) return;
   saving.value = true;
   try {
@@ -669,7 +669,7 @@ const saveTransaction = async () => {
 
 // Loan Actions
 const openLoanModal = (item: any) => {
-  if (!authStore.editMode) return;
+  if (!editMode) return;
   selectedItem.value = item;
   loanForm.value = {borrower: '', quantity: 1, note: ''};
   if (showDetailModal.value) {
@@ -680,7 +680,7 @@ const openLoanModal = (item: any) => {
 };
 
 const saveLoan = async () => {
-  if (!authStore.editMode) return;
+  if (!editMode) return;
   saving.value = true;
   try {
     await axios.post(`/api/items/${selectedItem.value.id}/loans`, loanForm.value);
@@ -699,7 +699,7 @@ const saveLoan = async () => {
 };
 
 const returnLoan = async (id: string) => {
-  if (!authStore.editMode) return;
+  if (!editMode) return;
   try {
     await axios.post(`/api/loans/${id}/return`, {});
     await fetchData(true);
@@ -709,7 +709,7 @@ const returnLoan = async (id: string) => {
 };
 
 const deleteLoan = async (id: string) => {
-  if (!authStore.editMode) return;
+  if (!editMode) return;
   if (confirm('Delete this loan record?')) {
     try {
       await axios.delete(`/api/loans/${id}`);
@@ -756,7 +756,7 @@ onUnmounted(() => {
       </button>
     </div>
 
-    <div v-if="authStore.editMode && (currentTab === 'items' || currentTab === 'categories')" class="actions-row">
+    <div v-if="editMode && (currentTab === 'items' || currentTab === 'categories')" class="actions-row">
       <button v-if="currentTab === 'items'" class="btn-primary" @click="openItemModal()">
         <Plus :size="20" style="vertical-align: middle;"/>
         Add Item
@@ -788,8 +788,8 @@ onUnmounted(() => {
 
       <div class="grid" v-else>
         <div v-for="cat in filteredCategories" :key="cat.id" class="item-card"
-             @click="authStore.editMode && openCategoryModal(cat)"
-             :style="{ borderColor: cat.color || 'var(--border-color)', cursor: authStore.editMode ? 'pointer' : 'default' }">
+             @click="editMode && openCategoryModal(cat)"
+             :style="{ borderColor: cat.color || 'var(--border-color)', cursor: editMode ? 'pointer' : 'default' }">
           <h3 :style="{ color: cat.color || 'var(--accent-purple)', margin: '0 0 8px 0' }">
             <Lock v-if="cat.isPrivate" :size="14" :color="cat.private ? '#ef4444' : '#f59e0b'"
                   style="margin-right: 6px; vertical-align: middle;" title="Private"/>
@@ -829,18 +829,18 @@ onUnmounted(() => {
               Note: {{ loan.note }}</p>
           </div>
           <div class="actions" style="flex-direction: column; gap: 8px;">
-            <button v-if="authStore.editMode && !loan.returnedAt" class="btn-primary btn-small"
+            <button v-if="editMode && !loan.returnedAt" class="btn-primary btn-small"
                     @click="returnLoan(loan.id)">Return
             </button>
             <span v-else class="silver-text"><CheckCircle :size="16"/> Returned</span>
-            <button v-if="authStore.editMode" class="btn-danger btn-small" @click="deleteLoan(loan.id)">Delete</button>
+            <button v-if="editMode" class="btn-danger btn-small" @click="deleteLoan(loan.id)">Delete</button>
           </div>
         </div>
       </div>
     </div>
 
     <!-- Item Modal -->
-    <div v-if="authStore.editMode && showItemModal" class="modal-overlay" @click.self="showItemModal = false">
+    <div v-if="editMode && showItemModal" class="modal-overlay" @click.self="showItemModal = false">
       <div class="modal-content">
         <div class="modal-header">
           <h2 class="accent-text">{{ editingItem ? 'Edit Item' : 'Add New Item' }}</h2>
@@ -1089,7 +1089,7 @@ onUnmounted(() => {
     </div>
 
     <!-- Category Modal -->
-    <div v-if="authStore.editMode && showCategoryModal" class="modal-overlay" @click.self="showCategoryModal = false">
+    <div v-if="editMode && showCategoryModal" class="modal-overlay" @click.self="showCategoryModal = false">
       <div class="modal-content">
         <div class="modal-header">
           <h2 class="accent-text">{{ editingCategory ? 'Edit Category' : 'Add Category' }}</h2>
@@ -1141,7 +1141,7 @@ onUnmounted(() => {
     </div>
 
     <!-- Transaction Modal -->
-    <div v-if="authStore.editMode && showTransactionModal" class="modal-overlay"
+    <div v-if="editMode && showTransactionModal" class="modal-overlay"
          @click.self="showTransactionModal = false">
       <div class="modal-content">
         <div class="modal-header">
@@ -1193,7 +1193,7 @@ onUnmounted(() => {
     </div>
 
     <!-- Loan Modal -->
-    <div v-if="authStore.editMode && showLoanModal" class="modal-overlay" @click.self="showLoanModal = false">
+    <div v-if="editMode && showLoanModal" class="modal-overlay" @click.self="showLoanModal = false">
       <div class="modal-content">
         <div class="modal-header">
           <h2 class="accent-text">Lend Item: {{ selectedItem?.name }}</h2>
@@ -1243,7 +1243,7 @@ onUnmounted(() => {
             <Package :size="64" :stroke-width="1.5" class="silver-text" style="opacity: 0.8;"/>
           </div>
 
-          <div v-if="authStore.editMode" class="actions"
+          <div v-if="editMode" class="actions"
                style="margin-top: 10px; margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 20px;">
             <button class="btn-secondary" title="Edit" @click="openItemModal(selectedItem)">
               <Edit2 :size="18" style="vertical-align: middle; margin-right: 8px;"/>

@@ -1,3 +1,59 @@
+<script setup lang="ts">
+import { ref, onMounted } from 'vue';
+import { useArtisticQuestionStore } from '../stores/artisticQuestion';
+import { Plus, HelpCircle, Edit2, Trash2, X } from 'lucide-vue-next';
+
+const { questions, loading, fetchQuestions, updateQuestion, createQuestion, deleteQuestion } = useArtisticQuestionStore();
+const showAddModal = ref(false);
+const editingQuestion = ref<any>(null);
+
+const form = ref({
+  question: '',
+  answer: ''
+});
+
+onMounted(() => {
+  fetchQuestions();
+});
+
+const editQuestion = (q: any) => {
+  editingQuestion.value = q;
+  form.value = {
+    question: q.question,
+    answer: q.answer
+  };
+};
+
+const closeModal = () => {
+  showAddModal.value = false;
+  editingQuestion.value = null;
+  form.value = { question: '', answer: '' };
+};
+
+const saveQuestion = async () => {
+  if (editingQuestion.value) {
+    await updateQuestion(editingQuestion.value.id, form.value.question, form.value.answer);
+  } else {
+    await createQuestion(form.value.question, form.value.answer);
+  }
+  closeModal();
+};
+
+const _deleteQuestion = async (id: string) => {
+  if (confirm('Are you sure you want to delete this question?')) {
+    await deleteQuestion(id);
+  }
+};
+
+const formatDate = (date: any) => {
+  return new Date(date).toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
+};
+</script>
+
 <template>
   <div class="container">
     <div class="header-row">
@@ -7,10 +63,10 @@
       </button>
     </div>
 
-    <div v-if="artisticStore.loading" class="silver-text">Loading questions...</div>
+    <div v-if="loading" class="silver-text">Loading questions...</div>
 
-    <div v-if="artisticStore.questions.length > 0" class="questions-list">
-      <div v-for="q in artisticStore.questions" :key="q.id" class="card question-card">
+    <div v-if="questions.length > 0" class="questions-list">
+      <div v-for="q in questions" :key="q.id" class="card question-card">
         <div class="question-header">
           <div class="question-text">
             <HelpCircle :size="20" class="accent-purple" style="flex-shrink: 0;" />
@@ -20,7 +76,7 @@
             <button class="icon-btn" @click="editQuestion(q)" title="Edit">
               <Edit2 :size="16" />
             </button>
-            <button class="icon-btn" @click="deleteQuestion(q.id)" title="Delete" style="color: #ef4444;">
+            <button class="icon-btn" @click="_deleteQuestion(q.id)" title="Delete" style="color: #ef4444;">
               <Trash2 :size="16" />
             </button>
           </div>
@@ -59,62 +115,6 @@
     </div>
   </div>
 </template>
-
-<script setup lang="ts">
-import { ref, onMounted } from 'vue';
-import { useArtisticQuestionStore } from '../stores/artisticQuestion';
-import { Plus, HelpCircle, Edit2, Trash2, X } from 'lucide-vue-next';
-
-const artisticStore = useArtisticQuestionStore();
-const showAddModal = ref(false);
-const editingQuestion = ref<any>(null);
-
-const form = ref({
-  question: '',
-  answer: ''
-});
-
-onMounted(() => {
-  artisticStore.fetchQuestions();
-});
-
-const editQuestion = (q: any) => {
-  editingQuestion.value = q;
-  form.value = {
-    question: q.question,
-    answer: q.answer
-  };
-};
-
-const closeModal = () => {
-  showAddModal.value = false;
-  editingQuestion.value = null;
-  form.value = { question: '', answer: '' };
-};
-
-const saveQuestion = async () => {
-  if (editingQuestion.value) {
-    await artisticStore.updateQuestion(editingQuestion.value.id, form.value.question, form.value.answer);
-  } else {
-    await artisticStore.createQuestion(form.value.question, form.value.answer);
-  }
-  closeModal();
-};
-
-const deleteQuestion = async (id: string) => {
-  if (confirm('Are you sure you want to delete this question?')) {
-    await artisticStore.deleteQuestion(id);
-  }
-};
-
-const formatDate = (date: any) => {
-  return new Date(date).toLocaleDateString(undefined, { 
-    year: 'numeric', 
-    month: 'long', 
-    day: 'numeric' 
-  });
-};
-</script>
 
 <style scoped>
 .header-row {

@@ -29,7 +29,7 @@ const password = ref('');
 const loading = ref(false);
 const error = ref('');
 
-const authStore = useAuthStore();
+const { editMode, showPrivate, checkAuth } = useAuthStore();
 const router = useRouter();
 
 const handleSubmit = async () => {
@@ -40,10 +40,10 @@ const handleSubmit = async () => {
     
     // Reset settings.ts for the new user session
     localStorage.clear();
-    authStore.editMode.value = false;
-    authStore.showPrivate.value = false;
+    editMode.value = false;
+    showPrivate.value = false;
 
-    await authStore.checkAuth();
+    await checkAuth();
     
     if (res.data.requires2FA) {
       router.push('/verify-2fa').catch(() => {});

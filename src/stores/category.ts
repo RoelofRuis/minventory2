@@ -6,7 +6,7 @@ const categories = ref<any[]>([]);
 const loading = ref(false);
 
 export function useCategoryStore() {
-  const authStore = useAuthStore();
+  const {showPrivate} = useAuthStore();
 
   const fetchCategories = async (force = false) => {
     if (categories.value.length > 0 && !force) return;
@@ -22,7 +22,7 @@ export function useCategoryStore() {
   };
 
   const visibleCategories = computed(() => {
-    return authStore.showPrivate ? categories.value : categories.value.filter(c => !c.private);
+    return showPrivate ? categories.value : categories.value.filter(c => !c.private);
   });
 
   const getCategoryName = (id: string) => categories.value.find(c => c.id === id)?.name || 'Unknown';

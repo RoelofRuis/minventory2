@@ -28,7 +28,7 @@ export function useAuthStore() {
         }
     };
 
-    const logout = async () => {
+    const logoutSession = async () => {
         try {
             await axios.post('/api/auth/logout');
         } catch (err) {
@@ -68,7 +68,7 @@ export function useAuthStore() {
         isAuthenticated,
         is2FAVerified,
         checkAuth,
-        logout,
+        logoutSession,
         togglePrivate,
         setEditMode,
     };

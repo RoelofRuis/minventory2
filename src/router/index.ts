@@ -21,26 +21,24 @@ const router = createRouter({
 });
 
 router.beforeEach(async (to) => {
-  const authStore = useAuthStore();
+  const { isAuthenticated, is2FAVerified, checkAuth } = useAuthStore();
 
-  console.log(authStore.user.value)
-
-  if (to.meta.requiresAuth && !authStore.isAuthenticated.value) {
+  if (to.meta.requiresAuth && !isAuthenticated.value) {
     try {
-      await authStore.checkAuth();
+      await checkAuth();
     } catch {}
-    if (!authStore.isAuthenticated.value && to.path !== '/login') {
+    if (!isAuthenticated.value && to.path !== '/login') {
       return { path: '/login', replace: true };
     }
   }
 
   // If authenticated but 2FA is needed, redirect to /verify-2fa (unless already there)
-  if (authStore.isAuthenticated.value && !authStore.is2FAVerified.value && to.path !== '/verify-2fa') {
+  if (isAuthenticated.value && !is2FAVerified.value && to.path !== '/verify-2fa') {
     return { path: '/verify-2fa', replace: true };
   }
 
   // If already authenticated (including 2FA), redirect away from login
-  if (to.path === '/login' && authStore.isAuthenticated.value && authStore.is2FAVerified.value) {
+  if (to.path === '/login' && isAuthenticated.value && is2FAVerified.value) {
     return { path: '/', replace: true };
   }
 
