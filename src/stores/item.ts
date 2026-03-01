@@ -2,7 +2,7 @@ import { ref, computed, watch } from 'vue';
 import axios from 'axios';
 import { useAuthStore } from './auth';
 import { useCategoryStore } from './category';
-import {filter} from "./filter.ts";
+import {useFilters} from "./filter.ts";
 
 const imageUrlCache = new Map<string, string>();
 
@@ -10,7 +10,7 @@ const items = ref<any[]>([]);
 const loading = ref(false);
 
 export function useItemStore() {
-  const {showPrivate} = useAuthStore();
+  const { showPrivate } = useAuthStore();
 
   const { categories } = useCategoryStore();
   const {
@@ -21,7 +21,7 @@ export function useItemStore() {
     selectedIntentions,
     selectedAttachments,
     searchQuery
-  } = filter();
+  } = useFilters();
 
   const fetchItems = async (force = false) => {
     if (items.value.length > 0 && !force) return;
@@ -47,7 +47,7 @@ export function useItemStore() {
       }));
 
       // When private mode is off, proactively remove private items from memory
-      if (!showPrivate) {
+      if (!showPrivate.value) {
         items.value = items.value.filter((i: any) => !i.private);
       }
     } catch (err) {
@@ -70,6 +70,8 @@ export function useItemStore() {
       return null;
     }
   };
+
+  const getItemName = (id: string) => items.value.find(i => i.id === id)?.name || 'Unknown Item';
 
   watch(() => showPrivate, (val) => {
     if (!val) {
@@ -106,7 +108,7 @@ export function useItemStore() {
   const filteredItems = computed(() => {
     let result = items.value;
     
-    if (!showPrivate) {
+    if (!showPrivate.value) {
       result = result.filter(i => !i.private);
     }
     
@@ -174,6 +176,7 @@ export function useItemStore() {
     fetchObjectUrl,
     filteredItems,
     totalIndividualItems,
-    getDescendantIds
+    getDescendantIds,
+    getItemName,
   };
 }

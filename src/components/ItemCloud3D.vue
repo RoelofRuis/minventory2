@@ -12,7 +12,7 @@ import {useCategoryStore} from "../stores/category.ts";
 
 const { showPrivate } = useAuthStore();
 const { categories, fetchCategories, getCategoryName, getCategoryColor } = useCategoryStore();
-const visibleCategories = computed(() => showPrivate ? categories.value : categories.value.filter(c => !c.private));
+const visibleCategories = computed(() => showPrivate.value ? categories.value : categories.value.filter(c => !c.private));
 const {
   items,
   loading,

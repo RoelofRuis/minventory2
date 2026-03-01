@@ -27,7 +27,6 @@ const filteredCategories = computed(() => {
 </script>
 
 <template>
-
   <div class="card filter-bar">
     <div class="search-wrapper" style="flex: 1;">
       <input v-model="categorySearch" type="text" placeholder="Search categories..."/>

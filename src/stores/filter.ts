@@ -26,7 +26,7 @@ const selectedAttachments = ref<string[]>(loadIds('filter:selectedAttachments'))
 const mode = ref<FilterMode>(loadMode());
 const searchQuery = ref('');
 
-export function filter() {
+export function useFilters() {
     // Persist to localStorage whenever values change
     watch(
         selectedCategoryIds,

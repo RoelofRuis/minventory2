@@ -8,8 +8,7 @@ import axios from 'axios';
 import { logs, clearLogs } from './utils/logger';
 import {useSettings} from "./stores/settings.ts";
 
-const { user, showPrivate, editMode, isAuthenticated, setEditMode, togglePrivate, logoutSession } = useAuthStore();
-console.log(user)
+const { showPrivate, editMode, isAuthenticated, setEditMode, togglePrivate, logoutSession } = useAuthStore();
 const { gridColumns, setGridColumns } = useSettings();
 const route = useRoute();
 
@@ -42,7 +41,7 @@ const closeUnlockModal = () => {
 };
 
 const togglePrivateItems = async () => {
-  if (!showPrivate) {
+  if (!showPrivate.value) {
     unlockPassword.value = '';
     unlockError.value = '';
     showUnlockModal.value = true;
@@ -55,7 +54,7 @@ const togglePrivateItems = async () => {
 };
 
 const openPrivateFromSettings = async () => {
-  if (!showPrivate) {
+  if (!showPrivate.value) {
     showSettingsModal.value = false;
     await nextTick();
   }
@@ -63,9 +62,9 @@ const openPrivateFromSettings = async () => {
 };
 
 const toggleEditModeFromSettings = async () => {
-  if (!editMode) {
+  if (!editMode.value) {
     // Enabling edit mode should also enable private view. Prompt unlock if needed.
-    if (!showPrivate) {
+    if (!showPrivate.value) {
       pendingEnableEdit.value = true;
       showSettingsModal.value = false;
       await nextTick();

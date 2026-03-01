@@ -1,6 +1,12 @@
 <script setup lang="ts">
-
 import {CheckCircle} from "lucide-vue-next";
+import {useLoanStore} from "../../stores/loan.ts";
+import {useItemStore} from "../../stores/item.ts";
+import {useAuthStore} from "../../stores/auth.ts";
+
+const { editMode } = useAuthStore();
+const { loans, returnLoan, deleteLoan } = useLoanStore();
+const { getItemName } = useItemStore();
 </script>
 
 <template>

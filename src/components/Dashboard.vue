@@ -7,7 +7,7 @@ import {usageFrequencies, attachments, intentions, joys} from '../utils/constant
 import {
   Plus, Edit2, Trash2, Camera,
   ArrowRightLeft, Package, Tag, Users, ArrowLeft,
-  CheckCircle, X, Lock, Gift,
+  X, Lock, Gift,
   Smile, Zap, Target, Heart, Loader2
 } from 'lucide-vue-next';
 import {preload} from '@imgly/background-removal';
@@ -18,16 +18,17 @@ import {useItemStore} from "../stores/item.ts";
 import {useCategoryStore} from "../stores/category.ts";
 import {useSettings} from "../stores/settings.ts";
 import CategoriesTab from "./dashboard/CategoriesTab.vue";
+import {useLoanStore} from "../stores/loan.ts";
+import LoansTab from "./dashboard/LoansTab.vue";
 
 const { showPrivate, editMode } = useAuthStore();
 const { gridColumns } = useSettings();
-const {categories, fetchCategories, getCategoryName, getCategoryColor} = useCategoryStore();
-const {items, fetchItems} = useItemStore();
-
-const saving = ref(false);
+const { categories, fetchCategories, getCategoryName, getCategoryColor } = useCategoryStore();
+const { fetchLoans } = useLoanStore();
+const { items, fetchItems } = useItemStore();
 
 const currentTab = ref('items');
-const loans = ref<any[]>([]);
+const saving = ref(false);
 
 // Modals state
 const showItemModal = ref(false);
@@ -194,7 +195,7 @@ const closeMatches = computed(() => {
 
 const sortedCategories = computed(() => {
   let cats = categories.value;
-  if (!showPrivate) {
+  if (!showPrivate.value) {
     cats = cats.filter(c => !c.private);
   }
 
@@ -226,20 +227,19 @@ watch(() => showPrivate, () => {
 });
 
 // Fetching
+// TODO: deprecated
 const fetchData = async (force = false) => {
-  const [_, __, loansRes] = await Promise.all([
+  await Promise.all([
     fetchCategories(force),
     fetchItems(force),
-    axios.get('/api/loans')
+    fetchLoans(force),
   ]);
-
-  loans.value = (loansRes as any).data;
 };
 
 // Item Actions
-// Deprecated
+// TODO: Deprecated
 const openItemModal = (item: any = null, keepImage = false) => {
-  if (!editMode) return;
+  if (!editMode.value) return;
   editingItem.value = item;
   if (!keepImage) {
     file.value = null;
@@ -467,7 +467,7 @@ const toggleCategory = (catId: string) => {
 };
 
 const saveItem = async (stay = false) => {
-  if (!editMode) return;
+  if (!editMode.value) return;
   saving.value = true;
   try {
     const formData = new FormData();
@@ -531,7 +531,7 @@ const viewItemDetails = async (itemId: any) => {
   try {
     const res = await axios.get(`/api/items/${itemId}`);
     selectedItem.value = res.data;
-    if (editMode) {
+    if (editMode.value) {
       openItemModal(res.data);
     } else {
       modalView.value = 'detail';
@@ -543,7 +543,7 @@ const viewItemDetails = async (itemId: any) => {
 };
 
 const confirmDeleteItem = async (id: string) => {
-  if (!editMode) return;
+  if (!editMode.value) return;
   if (confirm('Are you sure you want to delete this item?')) {
     try {
       await axios.delete(`/api/items/${id}`);
@@ -556,7 +556,7 @@ const confirmDeleteItem = async (id: string) => {
 
 // Category Actions
 const openCategoryModal = (cat: any = null) => {
-  if (!editMode) return;
+  if (!editMode.value) return;
   editingCategory.value = cat;
   if (cat) {
     categoryForm.value = {
@@ -581,7 +581,7 @@ const openCategoryModal = (cat: any = null) => {
 };
 
 const saveCategory = async () => {
-  if (!editMode) return;
+  if (!editMode.value) return;
   saving.value = true;
   try {
     if (editingCategory.value) {
@@ -599,7 +599,7 @@ const saveCategory = async () => {
 };
 
 const deleteCategory = async (id: string) => {
-  if (!editMode) return;
+  if (!editMode.value) return;
   if (confirm('Are you sure? This will remove the category from all items.')) {
     try {
       await axios.delete(`/api/categories/${id}`);
@@ -618,7 +618,7 @@ const onParentCategoryChange = () => {
 
 // Transaction Actions
 const openTransactionModal = async (item: any) => {
-  if (!editMode) return;
+  if (!editMode.value) return;
   selectedItem.value = item;
   transactionForm.value = {delta: 0, note: '', reason: undefined};
 
@@ -637,7 +637,7 @@ const openTransactionModal = async (item: any) => {
 };
 
 const saveTransaction = async () => {
-  if (!editMode) return;
+  if (!editMode.value) return;
   if (transactionForm.value.delta === 0) return;
   saving.value = true;
   try {
@@ -658,7 +658,7 @@ const saveTransaction = async () => {
 
 // Loan Actions
 const openLoanModal = (item: any) => {
-  if (!editMode) return;
+  if (!editMode.value) return;
   selectedItem.value = item;
   loanForm.value = {borrower: '', quantity: 1, note: ''};
   if (showDetailModal.value) {
@@ -669,7 +669,7 @@ const openLoanModal = (item: any) => {
 };
 
 const saveLoan = async () => {
-  if (!editMode) return;
+  if (!editMode.value) return;
   saving.value = true;
   try {
     await axios.post(`/api/items/${selectedItem.value.id}/loans`, loanForm.value);
@@ -687,37 +687,11 @@ const saveLoan = async () => {
   }
 };
 
-const returnLoan = async (id: string) => {
-  if (!editMode) return;
-  try {
-    await axios.post(`/api/loans/${id}/return`, {});
-    await fetchData(true);
-  } catch (err) {
-    alert('Failed to return loan');
-  }
-};
-
-const deleteLoan = async (id: string) => {
-  if (!editMode) return;
-  if (confirm('Delete this loan record?')) {
-    try {
-      await axios.delete(`/api/loans/${id}`);
-      await fetchData(true);
-    } catch (err) {
-      alert('Failed to delete loan');
-    }
-  }
-};
-
-
 // Helpers
 const getCategoryDisplayName = (cat: any) => {
   const level = cat.level || 0;
   return '\u00A0\u00A0'.repeat(level) + cat.name;
 };
-
-const getItemName = (id: string) => items.value.find(i => i.id === id)?.name || 'Unknown Item';
-
 
 onMounted(() => {
   fetchData();
@@ -756,43 +730,18 @@ onUnmounted(() => {
       </button>
     </div>
 
-    <!-- Items Tab -->
     <div v-if="currentTab === 'items'">
       <ItemsTab @item-selected="(id) => viewItemDetails(id)"/>
     </div>
 
-    <!-- Categories Tab -->
     <div v-if="currentTab === 'categories'">
       <CategoriesTab
           @category-selected="(cat) => editMode && openCategoryModal(cat)"
       />
     </div>
 
-    <!-- Loans Tab -->
     <div v-if="currentTab === 'loans'">
-      <div v-if="loans.length === 0" class="silver-text">No active loans.</div>
-
-      <div v-for="loan in loans" :key="loan.id" class="card"
-           style="border-left: 4px solid var(--accent-purple); padding: 12px; margin-bottom: 12px;">
-        <div style="display: flex; justify-content: space-between;">
-          <div>
-            <h3 class="accent-text" style="margin: 0 0 4px 0;">{{ getItemName(loan.itemId) }}</h3>
-            <p class="silver-text" style="margin: 0 0 2px 0;">Borrowed by: <strong>{{ loan.borrower }}</strong></p>
-            <p class="silver-text" style="margin: 0 0 2px 0;">Quantity: {{ loan.quantity }}</p>
-            <p class="silver-text" style="font-size: 0.8rem; margin: 0 0 2px 0;">Lent at:
-              {{ new Date(loan.lentAt).toLocaleDateString() }}</p>
-            <p v-if="loan.note" class="silver-text" style="font-size: 0.8rem; font-style: italic; margin: 4px 0 0 0;">
-              Note: {{ loan.note }}</p>
-          </div>
-          <div class="actions" style="flex-direction: column; gap: 8px;">
-            <button v-if="editMode && !loan.returnedAt" class="btn-primary btn-small"
-                    @click="returnLoan(loan.id)">Return
-            </button>
-            <span v-else class="silver-text"><CheckCircle :size="16"/> Returned</span>
-            <button v-if="editMode" class="btn-danger btn-small" @click="deleteLoan(loan.id)">Delete</button>
-          </div>
-        </div>
-      </div>
+      <LoansTab/>
     </div>
 
     <!-- Item Modal -->
