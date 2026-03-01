@@ -1,4 +1,4 @@
-import { ref, watch } from 'vue';
+import {ref, watch} from 'vue';
 
 export type FilterMode = 'and' | 'or';
 
@@ -33,9 +33,10 @@ export function useFilters() {
         (ids) => {
             try {
                 localStorage.setItem('filter:selectedCategoryIds', JSON.stringify(ids));
-            } catch {}
+            } catch {
+            }
         },
-        { deep: true }
+        {deep: true}
     );
 
     watch(
@@ -43,9 +44,10 @@ export function useFilters() {
         (val) => {
             try {
                 localStorage.setItem('filter:selectedJoys', JSON.stringify(val));
-            } catch {}
+            } catch {
+            }
         },
-        { deep: true }
+        {deep: true}
     );
 
     watch(
@@ -53,9 +55,10 @@ export function useFilters() {
         (val) => {
             try {
                 localStorage.setItem('filter:selectedFrequencies', JSON.stringify(val));
-            } catch {}
+            } catch {
+            }
         },
-        { deep: true }
+        {deep: true}
     );
 
     watch(
@@ -63,9 +66,10 @@ export function useFilters() {
         (val) => {
             try {
                 localStorage.setItem('filter:selectedIntentions', JSON.stringify(val));
-            } catch {}
+            } catch {
+            }
         },
-        { deep: true }
+        {deep: true}
     );
 
     watch(
@@ -73,15 +77,17 @@ export function useFilters() {
         (val) => {
             try {
                 localStorage.setItem('filter:selectedAttachments', JSON.stringify(val));
-            } catch {}
+            } catch {
+            }
         },
-        { deep: true }
+        {deep: true}
     );
 
     watch(mode, (m) => {
         try {
             localStorage.setItem('filter:mode', m);
-        } catch {}
+        } catch {
+        }
     });
 
     const setSelectedCategoryIds = (ids: string[]) => {

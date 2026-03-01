@@ -91,7 +91,6 @@ onUnmounted(() => {
 });
 </script>
 
-
 <template>
   <div class="multiselect-container" ref="dropdownRef">
     <div class="multiselect-input" @click="focusCategorySearch">

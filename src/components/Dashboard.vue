@@ -1,28 +1,25 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed, nextTick, watch } from 'vue';
+import {ref, onMounted, onUnmounted, computed, nextTick, watch} from 'vue';
 import axios from 'axios';
-import { useAuthStore } from '../stores/auth';
-import FilterBar from './FilterBar.vue';
-import { useCategories } from '../composables/useCategories';
-import { useItems } from '../composables/useItems';
-import { formatStat, isDefined, getStatColor } from '../utils/formatters';
-import { usageFrequencies, attachments, intentions, joys } from '../utils/constants';
+import {useAuthStore} from '../stores/auth';
+import {useCategories} from '../composables/useCategories';
+import {useItems} from '../composables/useItems';
+import {formatStat, isDefined, getStatColor} from '../utils/formatters';
+import {usageFrequencies, attachments, intentions, joys} from '../utils/constants';
 import {
   Plus, Edit2, Trash2, Camera,
   ArrowRightLeft, Package, Tag, Users, ArrowLeft,
   CheckCircle, X, Lock, Gift,
   Smile, Zap, Target, Heart, Loader2
 } from 'lucide-vue-next';
-import { preload } from '@imgly/background-removal';
-import { downscaleImage } from '../utils/imageProcessor';
+import {preload} from '@imgly/background-removal';
+import {downscaleImage} from '../utils/imageProcessor';
 import BackgroundRemovalWorker from '../workers/background-removal.worker?worker';
+import ItemsTab from "./dashboard/ItemsTab.vue";
 
 const authStore = useAuthStore();
-const { categories, visibleCategories, fetchCategories, getCategoryName, getCategoryColor } = useCategories();
-const {
-  items, loading, selectedCategoryIds,
-  fetchItems, filteredItems, totalIndividualItems
-} = useItems();
+const {categories, visibleCategories, fetchCategories, getCategoryName, getCategoryColor} = useCategories();
+const {items, fetchItems} = useItems();
 
 const saving = ref(false);
 
@@ -47,6 +44,7 @@ const detailModalTitle = computed(() => {
   return '';
 });
 
+// TODO: Deprecated
 const selectedItem = ref<any>(null);
 const editingItem = ref<any>(null);
 const editingCategory = ref<any>(null);
@@ -149,7 +147,7 @@ watch(() => authStore.editMode, (isEdit) => {
     preloadBackgroundRemoval();
     initWorker();
   }
-}, { immediate: true });
+}, {immediate: true});
 
 watch([showItemModal, showCategoryModal, showTransactionModal, showLoanModal, showDetailModal, showCameraModal], (vals) => {
   if (vals.some(v => v)) {
@@ -216,7 +214,7 @@ const sortedCategories = computed(() => {
         .sort((a, b) => a.name.localeCompare(b.name));
 
     for (const child of children) {
-      result.push({ ...child, level });
+      result.push({...child, level});
       addChildren(child.id, level + 1);
     }
   };
@@ -226,7 +224,7 @@ const sortedCategories = computed(() => {
   const addedIds = new Set(result.map(c => c.id));
   const missed = cats.filter(c => !addedIds.has(c.id));
   for (const cat of missed) {
-    result.push({ ...cat, level: 0 });
+    result.push({...cat, level: 0});
   }
 
   return result;
@@ -248,6 +246,7 @@ const fetchData = async (force = false) => {
 };
 
 // Item Actions
+// Deprecated
 const openItemModal = (item: any = null, keepImage = false) => {
   if (!authStore.editMode) return;
   editingItem.value = item;
@@ -359,7 +358,7 @@ const applyBackgroundRemoval = async (sourceFile: File) => {
           reject(new Error(e.data.error));
         } else {
           const blob = e.data.blob;
-          const newFile = new File([blob], sourceFile.name.replace(/\.[^/.]+$/, "") + ".png", { type: 'image/png' });
+          const newFile = new File([blob], sourceFile.name.replace(/\.[^/.]+$/, "") + ".png", {type: 'image/png'});
           file.value = newFile;
           setPreview(blob);
           resolve();
@@ -402,7 +401,7 @@ const startCamera = async () => {
     await nextTick();
 
     stream.value = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: 'environment' },
+      video: {facingMode: 'environment'},
       audio: false
     });
 
@@ -452,8 +451,8 @@ const capturePhoto = async () => {
       for (let i = 0; i < byteString.length; i++) {
         ia[i] = byteString.charCodeAt(i);
       }
-      const blob = new Blob([ab], { type: mimeString });
-      const capturedFile = new File([blob], 'captured_photo.jpg', { type: 'image/jpeg' });
+      const blob = new Blob([ab], {type: mimeString});
+      const capturedFile = new File([blob], 'captured_photo.jpg', {type: 'image/jpeg'});
 
       originalFile.value = capturedFile;
       setOriginalPreview(capturedFile);
@@ -537,10 +536,9 @@ const saveItem = async (stay = false) => {
   }
 };
 
-// TODO: deprecated
-const viewItemDetails = async (item: any) => {
+const viewItemDetails = async (itemId: any) => {
   try {
-    const res = await axios.get(`/api/items/${item.id}`);
+    const res = await axios.get(`/api/items/${itemId}`);
     selectedItem.value = res.data;
     if (authStore.editMode) {
       openItemModal(res.data);
@@ -631,13 +629,14 @@ const onParentCategoryChange = () => {
 const openTransactionModal = async (item: any) => {
   if (!authStore.editMode) return;
   selectedItem.value = item;
-  transactionForm.value = { delta: 0, note: '', reason: undefined };
+  transactionForm.value = {delta: 0, note: '', reason: undefined};
 
   // Fetch latest transactions
   try {
     const res = await axios.get(`/api/items/${item.id}`);
     selectedItem.value = res.data;
-  } catch (err) {}
+  } catch (err) {
+  }
 
   if (showDetailModal.value) {
     modalView.value = 'transactions';
@@ -670,7 +669,7 @@ const saveTransaction = async () => {
 const openLoanModal = (item: any) => {
   if (!authStore.editMode) return;
   selectedItem.value = item;
-  loanForm.value = { borrower: '', quantity: 1, note: '' };
+  loanForm.value = {borrower: '', quantity: 1, note: ''};
   if (showDetailModal.value) {
     modalView.value = 'lend';
   } else {
@@ -720,7 +719,6 @@ const deleteLoan = async (id: string) => {
 };
 
 
-
 // Helpers
 const getCategoryDisplayName = (cat: any) => {
   const level = cat.level || 0;
@@ -743,103 +741,69 @@ onUnmounted(() => {
     <!-- Tabs -->
     <div class="tabs">
       <button :class="{ active: currentTab === 'items' }" @click="currentTab = 'items'">
-        <Package :size="18" style="vertical-align: middle; margin-right: 4px;" /> Items
+        <Package :size="18" style="vertical-align: middle; margin-right: 4px;"/>
+        Items
       </button>
       <button :class="{ active: currentTab === 'categories' }" @click="currentTab = 'categories'">
-        <Tag :size="18" style="vertical-align: middle; margin-right: 4px;" /> Categories
+        <Tag :size="18" style="vertical-align: middle; margin-right: 4px;"/>
+        Categories
       </button>
       <button :class="{ active: currentTab === 'loans' }" @click="currentTab = 'loans'">
-        <Users :size="18" style="vertical-align: middle; margin-right: 4px;" /> Loans
+        <Users :size="18" style="vertical-align: middle; margin-right: 4px;"/>
+        Loans
       </button>
     </div>
 
     <div v-if="authStore.editMode && (currentTab === 'items' || currentTab === 'categories')" class="actions-row">
       <button v-if="currentTab === 'items'" class="btn-primary" @click="openItemModal()">
-        <Plus :size="20" style="vertical-align: middle;" /> Add Item
+        <Plus :size="20" style="vertical-align: middle;"/>
+        Add Item
       </button>
       <button v-if="currentTab === 'categories'" class="btn-primary" @click="openCategoryModal()">
-        <Plus :size="20" style="vertical-align: middle;" /> Add Category
+        <Plus :size="20" style="vertical-align: middle;"/>
+        Add Category
       </button>
     </div>
 
     <!-- Items Tab -->
     <div v-if="currentTab === 'items'">
-      <FilterBar :categories="visibleCategories" :totalItems="totalIndividualItems" />
-
-      <div v-if="loading && items.length === 0" class="silver-text">Loading items...</div>
-      <div v-else-if="filteredItems.length === 0" class="silver-text">No items found.</div>
-      
-      <div class="grid">
-        <div v-for="item in filteredItems" :key="item.id" class="item-card">
-          <div @click="viewItemDetails(item)" style="cursor: pointer;">
-            <div class="item-image-wrapper">
-              <div class="quantity-badge" :title="'Quantity: ' + item.quantity">{{ item.quantity }}</div>
-              <img v-if="item.image" :src="item.image" />
-              <div v-else style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;">
-                <Package :size="32" :stroke-width="1.5" class="silver-text" style="opacity: 0.8;" />
-              </div>
-              <h3 class="item-title-overlay">
-                <Lock v-if="item.private" :size="12" color="#f59e0b" style="margin-right: 4px; vertical-align: middle;" title="Private" />
-                <Users v-if="item.isBorrowed" :size="12" color="#f59e0b" style="margin-right: 4px; vertical-align: middle;" title="Borrowed" />
-                <Gift v-if="item.isGifted" :size="12" color="#f59e0b" style="margin-right: 4px; vertical-align: middle;" title="Gifted" />
-                {{ item.name }}
-              </h3>
-            </div>
-
-            <div class="item-stats-row" v-if="isDefined(item.joy) || isDefined(item.usageFrequency) || isDefined(item.intention) || isDefined(item.attachment)">
-              <div v-if="isDefined(item.joy)" class="item-stat" :title="'Joy: ' + formatStat(item.joy)">
-                <Smile :size="14" :style="{ color: getStatColor(item.joy || 'medium') }" /> <span class="stat-text">{{ formatStat(item.joy) }}</span>
-              </div>
-              <div v-if="isDefined(item.usageFrequency)" class="item-stat" :title="'Usage: ' + formatStat(item.usageFrequency)">
-                <Zap :size="14" :style="{ color: getStatColor(item.usageFrequency || 'undefined') }" /> <span class="stat-text">{{ formatStat(item.usageFrequency) }}</span>
-              </div>
-              <div v-if="isDefined(item.intention)" class="item-stat" :title="'Intention: ' + formatStat(item.intention)">
-                <Target :size="14" :style="{ color: getStatColor(item.intention || 'undecided') }" /> <span class="stat-text">{{ formatStat(item.intention) }}</span>
-              </div>
-              <div v-if="isDefined(item.attachment)" class="item-stat" :title="'Attachment: ' + formatStat(item.attachment)">
-                <Heart :size="14" :style="{ color: getStatColor(item.attachment || 'undefined') }" /> <span class="stat-text">{{ formatStat(item.attachment) }}</span>
-              </div>
-            </div>
-            
-            <div v-if="item.categoryIds && item.categoryIds.length > 0">
-              <span v-for="catId in item.categoryIds" :key="catId" class="item-badge" 
-                :style="{ backgroundColor: getCategoryColor(catId) + '11', color: getCategoryColor(catId), cursor: 'pointer' }"
-                @click.stop="toggleFilterCategory(catId)">
-                {{ getCategoryName(catId) }}
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
+      <ItemsTab v-on:item-selected="(id) => viewItemDetails(id)"/>
     </div>
 
     <!-- Categories Tab -->
     <div v-if="currentTab === 'categories'">
       <div class="card filter-bar">
         <div class="search-wrapper" style="flex: 1;">
-          <input v-model="categorySearch" type="text" placeholder="Search categories..." />
+          <input v-model="categorySearch" type="text" placeholder="Search categories..."/>
           <button v-if="categorySearch" class="clear-button" @click="categorySearch = ''" title="Clear search">
-            <X :size="16" />
+            <X :size="16"/>
           </button>
         </div>
       </div>
-      
+
       <div v-if="categories.length === 0" class="silver-text">No categories created yet.</div>
       <div v-else-if="filteredCategories.length === 0" class="silver-text">No categories found.</div>
-      
+
       <div class="grid" v-else>
-        <div v-for="cat in filteredCategories" :key="cat.id" class="item-card" @click="authStore.editMode && openCategoryModal(cat)" :style="{ borderColor: cat.color || 'var(--border-color)', cursor: authStore.editMode ? 'pointer' : 'default' }">
+        <div v-for="cat in filteredCategories" :key="cat.id" class="item-card"
+             @click="authStore.editMode && openCategoryModal(cat)"
+             :style="{ borderColor: cat.color || 'var(--border-color)', cursor: authStore.editMode ? 'pointer' : 'default' }">
           <h3 :style="{ color: cat.color || 'var(--accent-purple)', margin: '0 0 8px 0' }">
-            <Lock v-if="cat.isPrivate" :size="14" :color="cat.private ? '#ef4444' : '#f59e0b'" style="margin-right: 6px; vertical-align: middle;" title="Private" />
+            <Lock v-if="cat.isPrivate" :size="14" :color="cat.private ? '#ef4444' : '#f59e0b'"
+                  style="margin-right: 6px; vertical-align: middle;" title="Private"/>
             {{ cat.name }}
           </h3>
-          <p class="silver-text" style="font-size: 0.9rem; margin-bottom: 8px;">{{ cat.description || 'No description' }}</p>
+          <p class="silver-text" style="font-size: 0.9rem; margin-bottom: 8px;">{{
+              cat.description || 'No description'
+            }}</p>
           <div class="item-stats-row" style="margin-top: auto;">
             <div class="item-stat" :title="'Items: ' + cat.count">
-              <Package :size="14" /> <span>{{ cat.count }}</span>
+              <Package :size="14"/>
+              <span>{{ cat.count }}</span>
             </div>
             <div v-if="cat.intentionalCount" class="item-stat" :title="'Target: ' + cat.intentionalCount">
-              <Target :size="14" /> <span>{{ cat.intentionalCount }}</span>
+              <Target :size="14"/>
+              <span>{{ cat.intentionalCount }}</span>
             </div>
           </div>
         </div>
@@ -849,19 +813,24 @@ onUnmounted(() => {
     <!-- Loans Tab -->
     <div v-if="currentTab === 'loans'">
       <div v-if="loans.length === 0" class="silver-text">No active loans.</div>
-      
-      <div v-for="loan in loans" :key="loan.id" class="card" style="border-left: 4px solid var(--accent-purple); padding: 12px; margin-bottom: 12px;">
+
+      <div v-for="loan in loans" :key="loan.id" class="card"
+           style="border-left: 4px solid var(--accent-purple); padding: 12px; margin-bottom: 12px;">
         <div style="display: flex; justify-content: space-between;">
           <div>
             <h3 class="accent-text" style="margin: 0 0 4px 0;">{{ getItemName(loan.itemId) }}</h3>
             <p class="silver-text" style="margin: 0 0 2px 0;">Borrowed by: <strong>{{ loan.borrower }}</strong></p>
             <p class="silver-text" style="margin: 0 0 2px 0;">Quantity: {{ loan.quantity }}</p>
-            <p class="silver-text" style="font-size: 0.8rem; margin: 0 0 2px 0;">Lent at: {{ new Date(loan.lentAt).toLocaleDateString() }}</p>
-            <p v-if="loan.note" class="silver-text" style="font-size: 0.8rem; font-style: italic; margin: 4px 0 0 0;">Note: {{ loan.note }}</p>
+            <p class="silver-text" style="font-size: 0.8rem; margin: 0 0 2px 0;">Lent at:
+              {{ new Date(loan.lentAt).toLocaleDateString() }}</p>
+            <p v-if="loan.note" class="silver-text" style="font-size: 0.8rem; font-style: italic; margin: 4px 0 0 0;">
+              Note: {{ loan.note }}</p>
           </div>
           <div class="actions" style="flex-direction: column; gap: 8px;">
-            <button v-if="authStore.editMode && !loan.returnedAt" class="btn-primary btn-small" @click="returnLoan(loan.id)">Return</button>
-            <span v-else class="silver-text"><CheckCircle :size="16" /> Returned</span>
+            <button v-if="authStore.editMode && !loan.returnedAt" class="btn-primary btn-small"
+                    @click="returnLoan(loan.id)">Return
+            </button>
+            <span v-else class="silver-text"><CheckCircle :size="16"/> Returned</span>
             <button v-if="authStore.editMode" class="btn-danger btn-small" @click="deleteLoan(loan.id)">Delete</button>
           </div>
         </div>
@@ -873,18 +842,22 @@ onUnmounted(() => {
       <div class="modal-content">
         <div class="modal-header">
           <h2 class="accent-text">{{ editingItem ? 'Edit Item' : 'Add New Item' }}</h2>
-          <X class="modal-close" :size="20" @click="showItemModal = false" />
+          <X class="modal-close" :size="20" @click="showItemModal = false"/>
         </div>
-        
-        <div v-if="editingItem" class="actions" style="margin-top: 10px; margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 20px;">
+
+        <div v-if="editingItem" class="actions"
+             style="margin-top: 10px; margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 20px;">
           <button type="button" class="btn-secondary" title="Transactions" @click="openTransactionModal(editingItem)">
-            <ArrowRightLeft :size="18" style="vertical-align: middle; margin-right: 8px;" /> Transactions
+            <ArrowRightLeft :size="18" style="vertical-align: middle; margin-right: 8px;"/>
+            Transactions
           </button>
           <button type="button" class="btn-secondary" title="Lend" @click="openLoanModal(editingItem)">
-            <Users :size="18" style="vertical-align: middle; margin-right: 8px;" /> Lend
+            <Users :size="18" style="vertical-align: middle; margin-right: 8px;"/>
+            Lend
           </button>
-          <button type="button" class="btn-danger" title="Delete" @click="confirmDeleteItem(editingItem.id); showItemModal = false" style="margin-left: auto;">
-            <Trash2 :size="18" />
+          <button type="button" class="btn-danger" title="Delete"
+                  @click="confirmDeleteItem(editingItem.id); showItemModal = false" style="margin-left: auto;">
+            <Trash2 :size="18"/>
           </button>
         </div>
         <form @submit.prevent="saveItem()">
@@ -893,8 +866,8 @@ onUnmounted(() => {
             <div class="form-group">
               <label>Categories</label>
               <div style="display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 10px;">
-                <div v-for="cat in categories" :key="cat.id" 
-                     class="item-badge" 
+                <div v-for="cat in categories" :key="cat.id"
+                     class="item-badge"
                      :style="{ cursor: 'pointer', backgroundColor: itemForm.categoryIds.includes(cat.id) ? (cat.color || 'var(--accent-purple)') : 'var(--input-bg)', color: itemForm.categoryIds.includes(cat.id) ? 'white' : 'var(--accent-silver)' }"
                      @click="toggleCategory(cat.id)">
                   {{ cat.name }}
@@ -932,36 +905,41 @@ onUnmounted(() => {
               </div>
             </div>
 
-            <div class="form-group" style="margin-top: 10px; border-top: 1px solid var(--border-color); padding-top: 15px;">
+            <div class="form-group"
+                 style="margin-top: 10px; border-top: 1px solid var(--border-color); padding-top: 15px;">
               <label>Name</label>
-              <input v-model="itemForm.name" ref="itemNameInput" type="text" required />
+              <input v-model="itemForm.name" ref="itemNameInput" type="text" required/>
             </div>
 
             <div class="form-group">
               <label>Quantity</label>
-              <input v-model="itemForm.quantity" type="number" step="any" :disabled="true" />
+              <input v-model="itemForm.quantity" type="number" step="any" :disabled="true"/>
             </div>
 
             <div class="form-group">
               <label>Image</label>
               <div style="text-align: center;">
-                <input type="file" ref="fileInputRef" accept="image/*" capture="environment" @change="handleFileChange" style="display: none;" />
-                <button type="button" class="btn-secondary" style="width: 100%; margin-bottom: 10px;" @click="triggerFileInput">
-                  <Camera :size="20" style="vertical-align: middle; margin-right: 8px;" />
+                <input type="file" ref="fileInputRef" accept="image/*" capture="environment" @change="handleFileChange"
+                       style="display: none;"/>
+                <button type="button" class="btn-secondary" style="width: 100%; margin-bottom: 10px;"
+                        @click="triggerFileInput">
+                  <Camera :size="20" style="vertical-align: middle; margin-right: 8px;"/>
                   {{ preview ? 'Change Photo' : 'Take Picture' }}
                 </button>
-                <img v-if="preview" :src="preview" style="max-width: 100%; border-radius: 8px; margin-top: 10px;" />
-                
-                <div v-if="preview" style="margin-top: 12px; display: flex; flex-direction: column; align-items: center; gap: 10px;">
+                <img v-if="preview" :src="preview" style="max-width: 100%; border-radius: 8px; margin-top: 10px;"/>
+
+                <div v-if="preview"
+                     style="margin-top: 12px; display: flex; flex-direction: column; align-items: center; gap: 10px;">
                   <div style="display: flex; align-items: center; gap: 12px;">
                     <label class="switch-container">
-                      <input type="checkbox" v-model="isolateObject" @change="handleIsolateChange" :disabled="processingBackground" />
+                      <input type="checkbox" v-model="isolateObject" @change="handleIsolateChange"
+                             :disabled="processingBackground"/>
                       <div class="switch-track">
                         <div class="switch-thumb"></div>
                       </div>
                       <span class="silver-text" style="font-size: 14px;">Isolate Object</span>
                     </label>
-                    <Loader2 v-if="processingBackground" class="animate-spin accent-purple" :size="18" />
+                    <Loader2 v-if="processingBackground" class="animate-spin accent-purple" :size="18"/>
                   </div>
                   <button type="button" class="btn-danger btn-small" @click="removeImage">Remove Image</button>
                 </div>
@@ -973,7 +951,7 @@ onUnmounted(() => {
             <!-- Basic info first when creating -->
             <div class="form-group">
               <label>Name</label>
-              <input v-model="itemForm.name" ref="itemNameInput" type="text" required />
+              <input v-model="itemForm.name" ref="itemNameInput" type="text" required/>
               <div v-if="closeMatches.length > 0" class="close-matches-list">
                 <div v-for="match in closeMatches" :key="match.id" class="close-match-item">
                   <span class="match-name">{{ match.name }}</span>
@@ -983,27 +961,31 @@ onUnmounted(() => {
                 </div>
               </div>
             </div>
-            
+
             <div class="form-group">
               <label>Image</label>
               <div style="text-align: center;">
-                <input type="file" ref="fileInputRef" accept="image/*" capture="environment" @change="handleFileChange" style="display: none;" />
-                <button type="button" class="btn-secondary" style="width: 100%; margin-bottom: 10px;" @click="triggerFileInput">
-                  <Camera :size="20" style="vertical-align: middle; margin-right: 8px;" />
+                <input type="file" ref="fileInputRef" accept="image/*" capture="environment" @change="handleFileChange"
+                       style="display: none;"/>
+                <button type="button" class="btn-secondary" style="width: 100%; margin-bottom: 10px;"
+                        @click="triggerFileInput">
+                  <Camera :size="20" style="vertical-align: middle; margin-right: 8px;"/>
                   {{ preview ? 'Change Photo' : 'Take Picture' }}
                 </button>
-                <img v-if="preview" :src="preview" style="max-width: 100%; border-radius: 8px; margin-top: 10px;" />
-                
-                <div v-if="preview" style="margin-top: 12px; display: flex; flex-direction: column; align-items: center; gap: 10px;">
+                <img v-if="preview" :src="preview" style="max-width: 100%; border-radius: 8px; margin-top: 10px;"/>
+
+                <div v-if="preview"
+                     style="margin-top: 12px; display: flex; flex-direction: column; align-items: center; gap: 10px;">
                   <div style="display: flex; align-items: center; gap: 12px;">
                     <label class="switch-container">
-                      <input type="checkbox" v-model="isolateObject" @change="handleIsolateChange" :disabled="processingBackground" />
+                      <input type="checkbox" v-model="isolateObject" @change="handleIsolateChange"
+                             :disabled="processingBackground"/>
                       <div class="switch-track">
                         <div class="switch-thumb"></div>
                       </div>
                       <span class="silver-text" style="font-size: 14px;">Isolate Object</span>
                     </label>
-                    <Loader2 v-if="processingBackground" class="animate-spin accent-purple" :size="18" />
+                    <Loader2 v-if="processingBackground" class="animate-spin accent-purple" :size="18"/>
                   </div>
                   <button type="button" class="btn-danger btn-small" @click="removeImage">Remove Image</button>
                 </div>
@@ -1012,14 +994,15 @@ onUnmounted(() => {
 
             <div class="form-group">
               <label>Quantity</label>
-              <input v-model="itemForm.quantity" type="number" step="any" />
+              <input v-model="itemForm.quantity" type="number" step="any"/>
             </div>
 
-            <div class="form-group" style="margin-top: 10px; border-top: 1px solid var(--border-color); padding-top: 15px;">
+            <div class="form-group"
+                 style="margin-top: 10px; border-top: 1px solid var(--border-color); padding-top: 15px;">
               <label>Categories</label>
               <div style="display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 10px;">
-                <div v-for="cat in categories" :key="cat.id" 
-                     class="item-badge" 
+                <div v-for="cat in categories" :key="cat.id"
+                     class="item-badge"
                      :style="{ cursor: 'pointer', backgroundColor: itemForm.categoryIds.includes(cat.id) ? (cat.color || 'var(--accent-purple)') : 'var(--input-bg)', color: itemForm.categoryIds.includes(cat.id) ? 'white' : 'var(--accent-silver)' }"
                      @click="toggleCategory(cat.id)">
                   {{ cat.name }}
@@ -1058,37 +1041,44 @@ onUnmounted(() => {
             </div>
           </template>
 
-          <div class="form-group" style="margin-top: 10px; border-top: 1px solid var(--border-color); padding-top: 15px; display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
+          <div class="form-group"
+               style="margin-top: 10px; border-top: 1px solid var(--border-color); padding-top: 15px; display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
             <label class="switch-container" style="margin-bottom: 0;">
-              <input type="checkbox" v-model="itemForm.isBorrowed" />
+              <input type="checkbox" v-model="itemForm.isBorrowed"/>
               <div class="switch-track">
                 <div class="switch-thumb"></div>
               </div>
               <span class="silver-text" style="font-size: 14px;">Borrowed</span>
             </label>
-            <div v-if="itemForm.isBorrowed" style="flex: 1; min-width: 150px; display: flex; align-items: center; gap: 10px;">
+            <div v-if="itemForm.isBorrowed"
+                 style="flex: 1; min-width: 150px; display: flex; align-items: center; gap: 10px;">
               <span class="silver-text" style="font-size: 14px;">From:</span>
-              <input v-model="itemForm.borrowedFrom" type="text" placeholder="Whom?" style="margin: 0;" />
+              <input v-model="itemForm.borrowedFrom" type="text" placeholder="Whom?" style="margin: 0;"/>
             </div>
           </div>
 
-          <div class="form-group" style="margin-top: 10px; border-top: 1px solid var(--border-color); padding-top: 15px; display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
+          <div class="form-group"
+               style="margin-top: 10px; border-top: 1px solid var(--border-color); padding-top: 15px; display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
             <label class="switch-container" style="margin-bottom: 0;">
-              <input type="checkbox" v-model="itemForm.isGifted" />
+              <input type="checkbox" v-model="itemForm.isGifted"/>
               <div class="switch-track">
                 <div class="switch-thumb"></div>
               </div>
               <span class="silver-text" style="font-size: 14px;">Gifted</span>
             </label>
-            <div v-if="itemForm.isGifted" style="flex: 1; min-width: 150px; display: flex; align-items: center; gap: 10px;">
+            <div v-if="itemForm.isGifted"
+                 style="flex: 1; min-width: 150px; display: flex; align-items: center; gap: 10px;">
               <span class="silver-text" style="font-size: 14px;">By:</span>
-              <input v-model="itemForm.giftedBy" type="text" placeholder="Whom?" style="margin: 0;" />
+              <input v-model="itemForm.giftedBy" type="text" placeholder="Whom?" style="margin: 0;"/>
             </div>
           </div>
 
           <div class="actions">
-            <button type="submit" class="btn-primary" :disabled="saving" style="flex: 1; width: auto;">{{ saving ? 'Saving...' : 'Save' }}</button>
-            <button v-if="!editingItem" type="button" class="btn-secondary" :disabled="saving" @click="saveItem(true)" style="flex: 1;">
+            <button type="submit" class="btn-primary" :disabled="saving" style="flex: 1; width: auto;">
+              {{ saving ? 'Saving...' : 'Save' }}
+            </button>
+            <button v-if="!editingItem" type="button" class="btn-secondary" :disabled="saving" @click="saveItem(true)"
+                    style="flex: 1;">
               {{ saving ? 'Saving...' : 'Save and Next' }}
             </button>
           </div>
@@ -1101,12 +1091,12 @@ onUnmounted(() => {
       <div class="modal-content">
         <div class="modal-header">
           <h2 class="accent-text">{{ editingCategory ? 'Edit Category' : 'Add Category' }}</h2>
-          <X class="modal-close" :size="20" @click="showCategoryModal = false" />
+          <X class="modal-close" :size="20" @click="showCategoryModal = false"/>
         </div>
         <form @submit.prevent="saveCategory">
           <div class="form-group">
             <label>Name</label>
-            <input v-model="categoryForm.name" type="text" required />
+            <input v-model="categoryForm.name" type="text" required/>
           </div>
           <div class="form-group">
             <label>Description</label>
@@ -1114,7 +1104,7 @@ onUnmounted(() => {
           </div>
           <div class="form-group">
             <label>Color</label>
-            <input v-model="categoryForm.color" type="color" style="height: 40px; padding: 2px;" />
+            <input v-model="categoryForm.color" type="color" style="height: 40px; padding: 2px;"/>
           </div>
           <div class="form-group">
             <label>Private</label>
@@ -1125,21 +1115,23 @@ onUnmounted(() => {
           </div>
           <div class="form-group">
             <label>Target Count (Optional)</label>
-            <input v-model="categoryForm.intentionalCount" type="number" />
+            <input v-model="categoryForm.intentionalCount" type="number"/>
           </div>
           <div class="form-group">
             <label>Parent Category</label>
             <select v-model="categoryForm.parentId" @change="onParentCategoryChange">
               <option :value="null">None</option>
-              <option v-for="cat in sortedCategories.filter(c => c.id !== editingCategory?.id)" :key="cat.id" :value="cat.id">
+              <option v-for="cat in sortedCategories.filter(c => c.id !== editingCategory?.id)" :key="cat.id"
+                      :value="cat.id">
                 {{ getCategoryDisplayName(cat) }}
               </option>
             </select>
           </div>
           <div class="actions">
             <button type="submit" class="btn-primary" :disabled="saving">Save</button>
-            <button v-if="editingCategory" type="button" class="btn-danger" title="Delete" @click="deleteCategory(editingCategory.id); showCategoryModal = false" style="margin-left: auto;">
-              <Trash2 :size="18" />
+            <button v-if="editingCategory" type="button" class="btn-danger" title="Delete"
+                    @click="deleteCategory(editingCategory.id); showCategoryModal = false" style="margin-left: auto;">
+              <Trash2 :size="18"/>
             </button>
           </div>
         </form>
@@ -1147,21 +1139,22 @@ onUnmounted(() => {
     </div>
 
     <!-- Transaction Modal -->
-    <div v-if="authStore.editMode && showTransactionModal" class="modal-overlay" @click.self="showTransactionModal = false">
+    <div v-if="authStore.editMode && showTransactionModal" class="modal-overlay"
+         @click.self="showTransactionModal = false">
       <div class="modal-content">
         <div class="modal-header">
           <h2 class="accent-text">Adjust Quantity: {{ selectedItem?.name }}</h2>
-          <X class="modal-close" :size="20" @click="showTransactionModal = false" />
+          <X class="modal-close" :size="20" @click="showTransactionModal = false"/>
         </div>
         <p class="silver-text">Current Quantity: {{ selectedItem?.quantity }}</p>
         <form @submit.prevent="saveTransaction">
           <div class="form-group">
             <label>Change (Positive or Negative)</label>
-            <input v-model="transactionForm.delta" type="number" step="any" required />
+            <input v-model="transactionForm.delta" type="number" step="any" required/>
           </div>
           <div class="form-group">
             <label>Note (Optional)</label>
-            <input v-model="transactionForm.note" type="text" />
+            <input v-model="transactionForm.note" type="text"/>
           </div>
           <div v-if="transactionForm.delta < 0" class="form-group">
             <label>Reason</label>
@@ -1184,9 +1177,12 @@ onUnmounted(() => {
 
         <div v-if="selectedItem?.transactions" style="margin-top: 20px;">
           <h4 class="silver-text">Recent Transactions</h4>
-          <div v-for="t in selectedItem.transactions" :key="t.id" style="font-size: 0.8rem; padding: 5px; border-bottom: 1px solid #444;">
+          <div v-for="t in selectedItem.transactions" :key="t.id"
+               style="font-size: 0.8rem; padding: 5px; border-bottom: 1px solid #444;">
             <span :class="t.delta > 0 ? 'accent-text' : 'error-text'">{{ t.delta > 0 ? '+' : '' }}{{ t.delta }}</span>
-            <span v-if="t.reason" class="silver-text" style="margin-left: 10px; font-style: italic;">({{ t.reason }})</span>
+            <span v-if="t.reason" class="silver-text" style="margin-left: 10px; font-style: italic;">({{
+                t.reason
+              }})</span>
             <span style="margin-left: 10px;">{{ t.note || 'No note' }}</span>
             <span class="silver-text" style="float: right;">{{ new Date(t.createdAt).toLocaleDateString() }}</span>
           </div>
@@ -1199,20 +1195,20 @@ onUnmounted(() => {
       <div class="modal-content">
         <div class="modal-header">
           <h2 class="accent-text">Lend Item: {{ selectedItem?.name }}</h2>
-          <X class="modal-close" :size="20" @click="showLoanModal = false" />
+          <X class="modal-close" :size="20" @click="showLoanModal = false"/>
         </div>
         <form @submit.prevent="saveLoan">
           <div class="form-group">
             <label>Borrower Name</label>
-            <input v-model="loanForm.borrower" type="text" required />
+            <input v-model="loanForm.borrower" type="text" required/>
           </div>
           <div class="form-group">
             <label>Quantity</label>
-            <input v-model="loanForm.quantity" type="number" step="any" required />
+            <input v-model="loanForm.quantity" type="number" step="any" required/>
           </div>
           <div class="form-group">
             <label>Note</label>
-            <input v-model="loanForm.note" type="text" />
+            <input v-model="loanForm.note" type="text"/>
           </div>
           <div class="actions">
             <button type="submit" class="btn-primary" :disabled="saving">Lend</button>
@@ -1225,95 +1221,108 @@ onUnmounted(() => {
       <div class="modal-content" style="max-width: 500px;">
         <div class="modal-header">
           <div style="display: flex; align-items: center; gap: 10px;">
-            <button v-if="modalView !== 'detail'" class="btn-secondary btn-small" style="padding: 4px 8px;" @click="modalView = 'detail'">
-              <ArrowLeft :size="16" />
+            <button v-if="modalView !== 'detail'" class="btn-secondary btn-small" style="padding: 4px 8px;"
+                    @click="modalView = 'detail'">
+              <ArrowLeft :size="16"/>
             </button>
             <h2 class="accent-text" style="display: flex; align-items: center; gap: 8px;">
-              <Lock v-if="modalView === 'detail' && selectedItem?.private" :size="20" style="color: #f59e0b;" />
+              <Lock v-if="modalView === 'detail' && selectedItem?.private" :size="20" style="color: #f59e0b;"/>
               {{ detailModalTitle }}
             </h2>
           </div>
-          <X class="modal-close" :size="20" @click="showDetailModal = false" />
+          <X class="modal-close" :size="20" @click="showDetailModal = false"/>
         </div>
-        
+
         <div v-if="modalView === 'detail'">
-          
-          <img v-if="selectedItem?.image" :src="selectedItem.image" style="width: 200px; height: 200px; object-fit: cover; border-radius: 12px; margin: 0 auto 20px auto; display: block;" />
-          <div v-else style="width: 200px; height: 200px; display: flex; align-items: center; justify-content: center; background-color: var(--input-bg); border-radius: 12px; margin: 0 auto 20px auto;">
-            <Package :size="64" :stroke-width="1.5" class="silver-text" style="opacity: 0.8;" />
+          <img v-if="selectedItem?.image" :src="selectedItem.image"
+               style="width: 200px; height: 200px; object-fit: cover; border-radius: 12px; margin: 0 auto 20px auto; display: block;"/>
+          <div v-else
+               style="width: 200px; height: 200px; display: flex; align-items: center; justify-content: center; background-color: var(--input-bg); border-radius: 12px; margin: 0 auto 20px auto;">
+            <Package :size="64" :stroke-width="1.5" class="silver-text" style="opacity: 0.8;"/>
           </div>
 
-          <div v-if="authStore.editMode" class="actions" style="margin-top: 10px; margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 20px;">
+          <div v-if="authStore.editMode" class="actions"
+               style="margin-top: 10px; margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 20px;">
             <button class="btn-secondary" title="Edit" @click="openItemModal(selectedItem)">
-              <Edit2 :size="18" style="vertical-align: middle; margin-right: 8px;" /> Edit
+              <Edit2 :size="18" style="vertical-align: middle; margin-right: 8px;"/>
+              Edit
             </button>
             <button class="btn-secondary" title="Transactions" @click="openTransactionModal(selectedItem)">
-              <ArrowRightLeft :size="18" style="vertical-align: middle; margin-right: 8px;" /> Transactions
+              <ArrowRightLeft :size="18" style="vertical-align: middle; margin-right: 8px;"/>
+              Transactions
             </button>
             <button class="btn-secondary" title="Lend" @click="openLoanModal(selectedItem)">
-              <Users :size="18" style="vertical-align: middle; margin-right: 8px;" /> Lend
+              <Users :size="18" style="vertical-align: middle; margin-right: 8px;"/>
+              Lend
             </button>
-            <button class="btn-danger" title="Delete" @click="confirmDeleteItem(selectedItem.id); showDetailModal = false" style="margin-left: auto;">
-              <Trash2 :size="18" />
+            <button class="btn-danger" title="Delete"
+                    @click="confirmDeleteItem(selectedItem.id); showDetailModal = false" style="margin-left: auto;">
+              <Trash2 :size="18"/>
             </button>
           </div>
-          
+
           <div class="stats-grid">
             <div class="stat-card">
               <div class="stat-label">Quantity</div>
               <div class="stat-value" style="display: flex; align-items: center; justify-content: center; gap: 6px;">
-                <Package :size="16" class="silver-text" />
+                <Package :size="16" class="silver-text"/>
                 {{ selectedItem?.quantity }}
               </div>
             </div>
             <div v-if="isDefined(selectedItem?.usageFrequency)" class="stat-card">
               <div class="stat-label">Usage</div>
-              <div class="stat-value" :style="{ color: getStatColor(selectedItem?.usageFrequency || 'undefined'), display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }">
-                <Zap :size="16" />
+              <div class="stat-value"
+                   :style="{ color: getStatColor(selectedItem?.usageFrequency || 'undefined'), display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }">
+                <Zap :size="16"/>
                 {{ formatStat(selectedItem?.usageFrequency) }}
               </div>
             </div>
             <div v-if="isDefined(selectedItem?.joy)" class="stat-card">
               <div class="stat-label">Joy</div>
-              <div class="stat-value" :style="{ color: getStatColor(selectedItem?.joy || 'medium'), display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }">
-                <Smile :size="16" />
+              <div class="stat-value"
+                   :style="{ color: getStatColor(selectedItem?.joy || 'medium'), display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }">
+                <Smile :size="16"/>
                 {{ formatStat(selectedItem?.joy) }}
               </div>
             </div>
             <div v-if="isDefined(selectedItem?.intention)" class="stat-card">
               <div class="stat-label">Intention</div>
-              <div class="stat-value" :style="{ color: getStatColor(selectedItem?.intention || 'undecided'), display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }">
-                <Target :size="16" />
+              <div class="stat-value"
+                   :style="{ color: getStatColor(selectedItem?.intention || 'undecided'), display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }">
+                <Target :size="16"/>
                 {{ formatStat(selectedItem?.intention) }}
               </div>
             </div>
             <div v-if="isDefined(selectedItem?.attachment)" class="stat-card">
               <div class="stat-label">Attachment</div>
-              <div class="stat-value" :style="{ color: getStatColor(selectedItem?.attachment || 'undefined'), display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }">
-                <Heart :size="16" />
+              <div class="stat-value"
+                   :style="{ color: getStatColor(selectedItem?.attachment || 'undefined'), display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }">
+                <Heart :size="16"/>
                 {{ formatStat(selectedItem?.attachment) }}
               </div>
             </div>
             <div v-if="selectedItem?.isBorrowed" class="stat-card" style="border-color: #f59e0b;">
               <div class="stat-label">Borrowed From</div>
-              <div class="stat-value" style="display: flex; align-items: center; justify-content: center; gap: 6px; color: #f59e0b;">
-                <Users :size="16" />
+              <div class="stat-value"
+                   style="display: flex; align-items: center; justify-content: center; gap: 6px; color: #f59e0b;">
+                <Users :size="16"/>
                 {{ selectedItem?.borrowedFrom || 'Someone' }}
               </div>
             </div>
             <div v-if="selectedItem?.isGifted" class="stat-card" style="border-color: #f59e0b;">
               <div class="stat-label">Gifted By</div>
-              <div class="stat-value" style="display: flex; align-items: center; justify-content: center; gap: 6px; color: #f59e0b;">
-                <Gift :size="16" />
+              <div class="stat-value"
+                   style="display: flex; align-items: center; justify-content: center; gap: 6px; color: #f59e0b;">
+                <Gift :size="16"/>
                 {{ selectedItem?.giftedBy || 'Someone' }}
               </div>
             </div>
           </div>
 
           <div v-if="selectedItem?.categoryIds && selectedItem.categoryIds.length > 0" style="margin-top: 20px;">
-            <span v-for="catId in selectedItem.categoryIds" :key="catId" class="category-tag" 
-              :style="{ backgroundColor: getCategoryColor(catId), color: 'white', cursor: 'pointer' }"
-              @click.stop="toggleFilterCategory(catId)">
+            <span v-for="catId in selectedItem.categoryIds" :key="catId" class="category-tag"
+                  :style="{ backgroundColor: getCategoryColor(catId), color: 'white', cursor: 'pointer' }"
+            >
               {{ getCategoryName(catId) }}
             </span>
           </div>
@@ -1322,15 +1331,19 @@ onUnmounted(() => {
         <!-- Edit View -->
         <div v-else-if="modalView === 'edit'">
 
-          <div v-if="editingItem" class="actions" style="margin-top: 10px; margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 20px;">
+          <div v-if="editingItem" class="actions"
+               style="margin-top: 10px; margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 20px;">
             <button type="button" class="btn-secondary" title="Transactions" @click="openTransactionModal(editingItem)">
-              <ArrowRightLeft :size="18" style="vertical-align: middle; margin-right: 8px;" /> Transactions
+              <ArrowRightLeft :size="18" style="vertical-align: middle; margin-right: 8px;"/>
+              Transactions
             </button>
             <button type="button" class="btn-secondary" title="Lend" @click="openLoanModal(editingItem)">
-              <Users :size="18" style="vertical-align: middle; margin-right: 8px;" /> Lend
+              <Users :size="18" style="vertical-align: middle; margin-right: 8px;"/>
+              Lend
             </button>
-            <button type="button" class="btn-danger" title="Delete" @click="confirmDeleteItem(editingItem.id); showDetailModal = false" style="margin-left: auto;">
-              <Trash2 :size="18" />
+            <button type="button" class="btn-danger" title="Delete"
+                    @click="confirmDeleteItem(editingItem.id); showDetailModal = false" style="margin-left: auto;">
+              <Trash2 :size="18"/>
             </button>
           </div>
 
@@ -1340,10 +1353,10 @@ onUnmounted(() => {
               <div class="form-group">
                 <label>Categories</label>
                 <div style="display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 10px;">
-                  <div v-for="cat in categories" :key="cat.id" 
-                      class="item-badge" 
-                      :style="{ cursor: 'pointer', backgroundColor: itemForm.categoryIds.includes(cat.id) ? (cat.color || 'var(--accent-purple)') : 'var(--input-bg)', color: itemForm.categoryIds.includes(cat.id) ? 'white' : 'var(--accent-silver)' }"
-                      @click="toggleCategory(cat.id)">
+                  <div v-for="cat in categories" :key="cat.id"
+                       class="item-badge"
+                       :style="{ cursor: 'pointer', backgroundColor: itemForm.categoryIds.includes(cat.id) ? (cat.color || 'var(--accent-purple)') : 'var(--input-bg)', color: itemForm.categoryIds.includes(cat.id) ? 'white' : 'var(--accent-silver)' }"
+                       @click="toggleCategory(cat.id)">
                     {{ cat.name }}
                   </div>
                 </div>
@@ -1379,31 +1392,36 @@ onUnmounted(() => {
                 </div>
               </div>
 
-              <div class="form-group" style="margin-top: 10px; border-top: 1px solid var(--border-color); padding-top: 15px;">
+              <div class="form-group"
+                   style="margin-top: 10px; border-top: 1px solid var(--border-color); padding-top: 15px;">
                 <label>Name</label>
-                <input v-model="itemForm.name" ref="itemNameInput" type="text" required />
+                <input v-model="itemForm.name" ref="itemNameInput" type="text" required/>
               </div>
-              
+
               <div class="form-group">
                 <label>Image</label>
                 <div style="text-align: center;">
-                  <input type="file" ref="fileInputRef" accept="image/*" capture="environment" @change="handleFileChange" style="display: none;" />
-                  <button type="button" class="btn-secondary" style="width: 100%; margin-bottom: 10px;" @click="triggerFileInput">
-                    <Camera :size="20" style="vertical-align: middle; margin-right: 8px;" />
+                  <input type="file" ref="fileInputRef" accept="image/*" capture="environment"
+                         @change="handleFileChange" style="display: none;"/>
+                  <button type="button" class="btn-secondary" style="width: 100%; margin-bottom: 10px;"
+                          @click="triggerFileInput">
+                    <Camera :size="20" style="vertical-align: middle; margin-right: 8px;"/>
                     {{ preview ? 'Change Photo' : 'Take Picture' }}
                   </button>
-                  <img v-if="preview" :src="preview" style="max-width: 100%; border-radius: 8px; margin-top: 10px;" />
-                  
-                  <div v-if="preview" style="margin-top: 12px; display: flex; flex-direction: column; align-items: center; gap: 10px;">
+                  <img v-if="preview" :src="preview" style="max-width: 100%; border-radius: 8px; margin-top: 10px;"/>
+
+                  <div v-if="preview"
+                       style="margin-top: 12px; display: flex; flex-direction: column; align-items: center; gap: 10px;">
                     <div style="display: flex; align-items: center; gap: 12px;">
                       <label class="switch-container">
-                        <input type="checkbox" v-model="isolateObject" @change="handleIsolateChange" :disabled="processingBackground" />
+                        <input type="checkbox" v-model="isolateObject" @change="handleIsolateChange"
+                               :disabled="processingBackground"/>
                         <div class="switch-track">
                           <div class="switch-thumb"></div>
                         </div>
                         <span class="silver-text" style="font-size: 14px;">Isolate Object</span>
                       </label>
-                      <Loader2 v-if="processingBackground" class="animate-spin accent-purple" :size="18" />
+                      <Loader2 v-if="processingBackground" class="animate-spin accent-purple" :size="18"/>
                     </div>
                     <button type="button" class="btn-danger btn-small" @click="removeImage">Remove Image</button>
                   </div>
@@ -1414,42 +1432,47 @@ onUnmounted(() => {
               <!-- Standard order for creation (though less common in detail modal) -->
               <div class="form-group">
                 <label>Name</label>
-                <input v-model="itemForm.name" ref="itemNameInput" type="text" required />
+                <input v-model="itemForm.name" ref="itemNameInput" type="text" required/>
               </div>
-              
+
               <div class="form-group">
                 <label>Image</label>
                 <div style="text-align: center;">
-                  <input type="file" ref="fileInputRef" accept="image/*" capture="environment" @change="handleFileChange" style="display: none;" />
-                  <button type="button" class="btn-secondary" style="width: 100%; margin-bottom: 10px;" @click="triggerFileInput">
-                    <Camera :size="20" style="vertical-align: middle; margin-right: 8px;" />
+                  <input type="file" ref="fileInputRef" accept="image/*" capture="environment"
+                         @change="handleFileChange" style="display: none;"/>
+                  <button type="button" class="btn-secondary" style="width: 100%; margin-bottom: 10px;"
+                          @click="triggerFileInput">
+                    <Camera :size="20" style="vertical-align: middle; margin-right: 8px;"/>
                     {{ preview ? 'Change Photo' : 'Take Picture' }}
                   </button>
-                  <img v-if="preview" :src="preview" style="max-width: 100%; border-radius: 8px; margin-top: 10px;" />
-                  
-                  <div v-if="preview" style="margin-top: 12px; display: flex; flex-direction: column; align-items: center; gap: 10px;">
+                  <img v-if="preview" :src="preview" style="max-width: 100%; border-radius: 8px; margin-top: 10px;"/>
+
+                  <div v-if="preview"
+                       style="margin-top: 12px; display: flex; flex-direction: column; align-items: center; gap: 10px;">
                     <div style="display: flex; align-items: center; gap: 12px;">
                       <label class="switch-container">
-                        <input type="checkbox" v-model="isolateObject" @change="handleIsolateChange" :disabled="processingBackground" />
+                        <input type="checkbox" v-model="isolateObject" @change="handleIsolateChange"
+                               :disabled="processingBackground"/>
                         <div class="switch-track">
                           <div class="switch-thumb"></div>
                         </div>
                         <span class="silver-text" style="font-size: 14px;">Isolate Object</span>
                       </label>
-                      <Loader2 v-if="processingBackground" class="animate-spin accent-purple" :size="18" />
+                      <Loader2 v-if="processingBackground" class="animate-spin accent-purple" :size="18"/>
                     </div>
                     <button type="button" class="btn-danger btn-small" @click="removeImage">Remove Image</button>
                   </div>
                 </div>
               </div>
 
-              <div class="form-group" style="margin-top: 10px; border-top: 1px solid var(--border-color); padding-top: 15px;">
+              <div class="form-group"
+                   style="margin-top: 10px; border-top: 1px solid var(--border-color); padding-top: 15px;">
                 <label>Categories</label>
                 <div style="display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 10px;">
-                  <div v-for="cat in categories" :key="cat.id" 
-                      class="item-badge" 
-                      :style="{ cursor: 'pointer', backgroundColor: itemForm.categoryIds.includes(cat.id) ? (cat.color || 'var(--accent-purple)') : 'var(--input-bg)', color: itemForm.categoryIds.includes(cat.id) ? 'white' : 'var(--accent-silver)' }"
-                      @click="toggleCategory(cat.id)">
+                  <div v-for="cat in categories" :key="cat.id"
+                       class="item-badge"
+                       :style="{ cursor: 'pointer', backgroundColor: itemForm.categoryIds.includes(cat.id) ? (cat.color || 'var(--accent-purple)') : 'var(--input-bg)', color: itemForm.categoryIds.includes(cat.id) ? 'white' : 'var(--accent-silver)' }"
+                       @click="toggleCategory(cat.id)">
                     {{ cat.name }}
                   </div>
                 </div>
@@ -1486,37 +1509,42 @@ onUnmounted(() => {
               </div>
             </template>
 
-            <div class="form-group" style="margin-top: 10px; border-top: 1px solid var(--border-color); padding-top: 15px; display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
+            <div class="form-group"
+                 style="margin-top: 10px; border-top: 1px solid var(--border-color); padding-top: 15px; display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
               <label class="switch-container" style="margin-bottom: 0;">
-                <input type="checkbox" v-model="itemForm.isBorrowed" />
+                <input type="checkbox" v-model="itemForm.isBorrowed"/>
                 <div class="switch-track">
                   <div class="switch-thumb"></div>
                 </div>
                 <span class="silver-text" style="font-size: 14px;">Borrowed</span>
               </label>
-              <div v-if="itemForm.isBorrowed" style="flex: 1; min-width: 150px; display: flex; align-items: center; gap: 10px;">
+              <div v-if="itemForm.isBorrowed"
+                   style="flex: 1; min-width: 150px; display: flex; align-items: center; gap: 10px;">
                 <span class="silver-text" style="font-size: 14px;">From:</span>
-                <input v-model="itemForm.borrowedFrom" type="text" placeholder="Whom?" style="margin: 0;" />
+                <input v-model="itemForm.borrowedFrom" type="text" placeholder="Whom?" style="margin: 0;"/>
               </div>
             </div>
 
-            <div class="form-group" style="margin-top: 10px; border-top: 1px solid var(--border-color); padding-top: 15px; display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
+            <div class="form-group"
+                 style="margin-top: 10px; border-top: 1px solid var(--border-color); padding-top: 15px; display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
               <label class="switch-container" style="margin-bottom: 0;">
-                <input type="checkbox" v-model="itemForm.isGifted" />
+                <input type="checkbox" v-model="itemForm.isGifted"/>
                 <div class="switch-track">
                   <div class="switch-thumb"></div>
                 </div>
                 <span class="silver-text" style="font-size: 14px;">Gifted</span>
               </label>
-              <div v-if="itemForm.isGifted" style="flex: 1; min-width: 150px; display: flex; align-items: center; gap: 10px;">
+              <div v-if="itemForm.isGifted"
+                   style="flex: 1; min-width: 150px; display: flex; align-items: center; gap: 10px;">
                 <span class="silver-text" style="font-size: 14px;">By:</span>
-                <input v-model="itemForm.giftedBy" type="text" placeholder="Whom?" style="margin: 0;" />
+                <input v-model="itemForm.giftedBy" type="text" placeholder="Whom?" style="margin: 0;"/>
               </div>
             </div>
 
             <div class="actions">
               <button type="submit" class="btn-primary" :disabled="saving">
-                <Loader2 v-if="saving" class="animate-spin" :size="18" style="vertical-align: middle; margin-right: 8px;" />
+                <Loader2 v-if="saving" class="animate-spin" :size="18"
+                         style="vertical-align: middle; margin-right: 8px;"/>
                 {{ editingItem ? 'Update' : 'Save' }}
               </button>
             </div>
@@ -1529,11 +1557,11 @@ onUnmounted(() => {
           <form @submit.prevent="saveTransaction">
             <div class="form-group">
               <label>Change (Positive or Negative)</label>
-              <input v-model="transactionForm.delta" type="number" step="any" required />
+              <input v-model="transactionForm.delta" type="number" step="any" required/>
             </div>
             <div class="form-group">
               <label>Note (Optional)</label>
-              <input v-model="transactionForm.note" type="text" />
+              <input v-model="transactionForm.note" type="text"/>
             </div>
             <div v-if="transactionForm.delta < 0" class="form-group">
               <label>Reason</label>
@@ -1556,9 +1584,12 @@ onUnmounted(() => {
 
           <div v-if="selectedItem?.transactions" style="margin-top: 20px;">
             <h4 class="silver-text">Recent Transactions</h4>
-            <div v-for="t in selectedItem.transactions" :key="t.id" style="font-size: 0.8rem; padding: 5px; border-bottom: 1px solid #444;">
+            <div v-for="t in selectedItem.transactions" :key="t.id"
+                 style="font-size: 0.8rem; padding: 5px; border-bottom: 1px solid #444;">
               <span :class="t.delta > 0 ? 'accent-text' : 'error-text'">{{ t.delta > 0 ? '+' : '' }}{{ t.delta }}</span>
-              <span v-if="t.reason" class="silver-text" style="margin-left: 10px; font-style: italic;">({{ t.reason }})</span>
+              <span v-if="t.reason" class="silver-text" style="margin-left: 10px; font-style: italic;">({{
+                  t.reason
+                }})</span>
               <span style="margin-left: 10px;">{{ t.note || 'No note' }}</span>
               <span class="silver-text" style="float: right;">{{ new Date(t.createdAt).toLocaleDateString() }}</span>
             </div>
@@ -1570,15 +1601,15 @@ onUnmounted(() => {
           <form @submit.prevent="saveLoan">
             <div class="form-group">
               <label>Borrower Name</label>
-              <input v-model="loanForm.borrower" type="text" required />
+              <input v-model="loanForm.borrower" type="text" required/>
             </div>
             <div class="form-group">
               <label>Quantity</label>
-              <input v-model="loanForm.quantity" type="number" step="any" required />
+              <input v-model="loanForm.quantity" type="number" step="any" required/>
             </div>
             <div class="form-group">
               <label>Note</label>
-              <input v-model="loanForm.note" type="text" />
+              <input v-model="loanForm.note" type="text"/>
             </div>
             <div class="actions">
               <button type="submit" class="btn-primary" :disabled="saving">Lend</button>
@@ -1594,15 +1625,16 @@ onUnmounted(() => {
       <div class="modal-content" style="max-width: 600px; padding: 20px; text-align: center;">
         <div class="modal-header">
           <h2 class="accent-text" style="margin-top: 0;">Capture Photo</h2>
-          <X class="modal-close" :size="20" @click="closeCamera" />
+          <X class="modal-close" :size="20" @click="closeCamera"/>
         </div>
-        <div style="position: relative; width: 100%; aspect-ratio: 4/3; background: #000; border-radius: 12px; overflow: hidden; margin-bottom: 20px;">
+        <div
+            style="position: relative; width: 100%; aspect-ratio: 4/3; background: #000; border-radius: 12px; overflow: hidden; margin-bottom: 20px;">
           <video ref="videoRef" autoplay playsinline style="width: 100%; height: 100%; object-fit: cover;"></video>
           <canvas ref="canvasRef" style="display: none;"></canvas>
         </div>
         <div class="actions" style="justify-content: center;">
           <button type="button" class="btn-primary" @click="capturePhoto" style="width: auto;">
-            <Camera :size="20" style="vertical-align: middle; margin-right: 8px;" />
+            <Camera :size="20" style="vertical-align: middle; margin-right: 8px;"/>
             Capture
           </button>
         </div>
