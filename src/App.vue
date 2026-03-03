@@ -100,6 +100,15 @@ const confirmUnlock = async () => {
 const viewToggleLink = computed(() => route.path === '/cloud' ? '/' : '/cloud');
 const viewToggleTitle = computed(() => route.path === '/cloud' ? 'Back to List' : '3D Cloud View');
 
+const lastMainPath = ref('/');
+watch(() => route.path, (newPath) => {
+  if (newPath === '/' || newPath === '/cloud') {
+    lastMainPath.value = newPath;
+  }
+}, { immediate: true });
+
+const questionsToggleLink = computed(() => route.path === '/artistic' ? lastMainPath.value : '/artistic');
+
 watch([showSettingsModal, showUnlockModal], ([s1, s2]) => {
   if (s1 || s2) {
     document.body.classList.add('modal-open');
@@ -132,7 +141,7 @@ onUnmounted(() => {
       </router-link>
     </div>
     <div v-if="isAuthenticated" style="margin-top: 8px; display: flex; align-items: center; justify-content: center; gap: 10px;">
-      <router-link to="/artistic" class="btn-secondary btn-small" style="width: auto; white-space: nowrap;" title="Artistic Questions">
+      <router-link :to="questionsToggleLink" :class="[route.path === '/artistic' ? 'btn-primary' : 'btn-secondary', 'btn-small']" style="width: auto; white-space: nowrap;" title="Artistic Questions">
         <HelpCircle :size="16" style="vertical-align: middle; margin-right: 4px;" />
         Questions
       </router-link>

@@ -32,6 +32,9 @@ body {
   font-weight: 600;
   transition: all 0.15s ease-out;
   width: 100%;
+  text-decoration: none;
+  display: inline-block;
+  text-align: center;
 }
 
 .btn-primary:hover {
