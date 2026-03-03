@@ -7,7 +7,7 @@ import {usageFrequencies, attachments, intentions, joys} from '../utils/constant
 import {
   Plus, Edit2, Trash2, Camera,
   ArrowRightLeft, Package, Tag, Users, ArrowLeft,
-  X, Lock, Gift,
+  Lock, Gift,
   Smile, Zap, Target, Heart, Loader2
 } from 'lucide-vue-next';
 import {preload} from '@imgly/background-removal';
@@ -20,6 +20,7 @@ import {useSettings} from "../stores/settings.ts";
 import CategoriesTab from "./dashboard/CategoriesTab.vue";
 import {useLoanStore} from "../stores/loan.ts";
 import LoansTab from "./dashboard/LoansTab.vue";
+import Modal from "./Modal.vue";
 
 const { showPrivate, editMode } = useAuthStore();
 const { gridColumns } = useSettings();
@@ -31,10 +32,7 @@ const currentTab = ref('items');
 const saving = ref(false);
 
 // Modals state
-const showItemModal = ref(false);
 const showCategoryModal = ref(false);
-const showTransactionModal = ref(false);
-const showLoanModal = ref(false);
 const showDetailModal = ref(false);
 const modalView = ref('detail'); // 'detail', 'edit', 'transactions', 'lend'
 const showCameraModal = ref(false);
@@ -152,13 +150,10 @@ watch(() => editMode, (isEdit) => {
   }
 }, {immediate: true});
 
-watch([showItemModal, showCategoryModal, showTransactionModal, showLoanModal, showDetailModal, showCameraModal], (vals) => {
-  if (vals.some(v => v)) {
-    document.body.classList.add('modal-open');
-  } else {
+watch([showCategoryModal, showDetailModal, showCameraModal], (vals) => {
+  if (!vals.some(v => v)) {
     nextTick(() => {
       if (document.querySelectorAll('.modal-overlay').length === 0) {
-        document.body.classList.remove('modal-open');
         setPreview(null);
         setOriginalPreview(null);
       }
@@ -173,11 +168,6 @@ onUnmounted(() => {
     worker.terminate();
     worker = null;
   }
-  nextTick(() => {
-    if (document.querySelectorAll('.modal-overlay').length === 0) {
-      document.body.classList.remove('modal-open');
-    }
-  });
 });
 
 // Computed
@@ -287,11 +277,13 @@ const openItemModal = (item: any = null, keepImage = false) => {
     setOriginalPreview(null);
   }
 
-  if (showDetailModal.value) {
-    modalView.value = 'edit';
+  if (item) {
+    selectedItem.value = item;
   } else {
-    showItemModal.value = true;
+    selectedItem.value = null;
   }
+  modalView.value = 'edit';
+  showDetailModal.value = true;
 
   nextTick(() => {
     if (!item) {
@@ -509,14 +501,15 @@ const saveItem = async (stay = false) => {
         itemNameInput.value?.focus();
       });
     } else {
-      showItemModal.value = false;
-      if (showDetailModal.value) {
+      if (selectedItem.value) {
         modalView.value = 'detail';
         // Refresh selectedItem after save
         if (editingItem.value) {
           const res = await axios.get(`/api/items/${editingItem.value.id}`);
           selectedItem.value = res.data;
         }
+      } else {
+        showDetailModal.value = false;
       }
     }
     await fetchData(true);
@@ -629,11 +622,8 @@ const openTransactionModal = async (item: any) => {
   } catch (err) {
   }
 
-  if (showDetailModal.value) {
-    modalView.value = 'transactions';
-  } else {
-    showTransactionModal.value = true;
-  }
+  modalView.value = 'transactions';
+  showDetailModal.value = true;
 };
 
 const saveTransaction = async () => {
@@ -642,7 +632,6 @@ const saveTransaction = async () => {
   saving.value = true;
   try {
     await axios.post(`/api/items/${selectedItem.value.id}/transactions`, transactionForm.value);
-    showTransactionModal.value = false;
     if (showDetailModal.value) {
       modalView.value = 'detail';
       const res = await axios.get(`/api/items/${selectedItem.value.id}`);
@@ -661,11 +650,8 @@ const openLoanModal = (item: any) => {
   if (!editMode.value) return;
   selectedItem.value = item;
   loanForm.value = {borrower: '', quantity: 1, note: ''};
-  if (showDetailModal.value) {
-    modalView.value = 'lend';
-  } else {
-    showLoanModal.value = true;
-  }
+  modalView.value = 'lend';
+  showDetailModal.value = true;
 };
 
 const saveLoan = async () => {
@@ -673,7 +659,6 @@ const saveLoan = async () => {
   saving.value = true;
   try {
     await axios.post(`/api/items/${selectedItem.value.id}/loans`, loanForm.value);
-    showLoanModal.value = false;
     if (showDetailModal.value) {
       modalView.value = 'detail';
       const res = await axios.get(`/api/items/${selectedItem.value.id}`);
@@ -745,13 +730,7 @@ onUnmounted(() => {
     </div>
 
     <!-- Item Modal -->
-    <div v-if="editMode && showItemModal" class="modal-overlay" @click.self="showItemModal = false">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h2 class="accent-text">{{ editingItem ? 'Edit Item' : 'Add New Item' }}</h2>
-          <X class="modal-close" :size="20" @click="showItemModal = false"/>
-        </div>
-
+    <Modal :show="editMode && showItemModal" :title="editingItem ? 'Edit Item' : 'Add New Item'" @close="showItemModal = false">
         <div v-if="editingItem" class="actions"
              style="margin-top: 10px; margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 20px;">
           <button type="button" class="btn-secondary" title="Transactions" @click="openTransactionModal(editingItem)">
@@ -990,16 +969,10 @@ onUnmounted(() => {
             </button>
           </div>
         </form>
-      </div>
-    </div>
+    </Modal>
 
     <!-- Category Modal -->
-    <div v-if="editMode && showCategoryModal" class="modal-overlay" @click.self="showCategoryModal = false">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h2 class="accent-text">{{ editingCategory ? 'Edit Category' : 'Add Category' }}</h2>
-          <X class="modal-close" :size="20" @click="showCategoryModal = false"/>
-        </div>
+    <Modal :show="editMode && showCategoryModal" :title="editingCategory ? 'Edit Category' : 'Add Category'" @close="showCategoryModal = false">
         <form @submit.prevent="saveCategory">
           <div class="form-group">
             <label>Name</label>
@@ -1042,17 +1015,10 @@ onUnmounted(() => {
             </button>
           </div>
         </form>
-      </div>
-    </div>
+    </Modal>
 
     <!-- Transaction Modal -->
-    <div v-if="editMode && showTransactionModal" class="modal-overlay"
-         @click.self="showTransactionModal = false">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h2 class="accent-text">Adjust Quantity: {{ selectedItem?.name }}</h2>
-          <X class="modal-close" :size="20" @click="showTransactionModal = false"/>
-        </div>
+    <Modal :show="editMode && showTransactionModal" :title="`Adjust Quantity: ${selectedItem?.name}`" @close="showTransactionModal = false">
         <p class="silver-text">Current Quantity: {{ selectedItem?.quantity }}</p>
         <form @submit.prevent="saveTransaction">
           <div class="form-group">
@@ -1094,16 +1060,10 @@ onUnmounted(() => {
             <span class="silver-text" style="float: right;">{{ new Date(t.createdAt).toLocaleDateString() }}</span>
           </div>
         </div>
-      </div>
-    </div>
+    </Modal>
 
     <!-- Loan Modal -->
-    <div v-if="editMode && showLoanModal" class="modal-overlay" @click.self="showLoanModal = false">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h2 class="accent-text">Lend Item: {{ selectedItem?.name }}</h2>
-          <X class="modal-close" :size="20" @click="showLoanModal = false"/>
-        </div>
+    <Modal :show="editMode && showLoanModal" :title="`Lend Item: ${selectedItem?.name}`" @close="showLoanModal = false">
         <form @submit.prevent="saveLoan">
           <div class="form-group">
             <label>Borrower Name</label>
@@ -1121,24 +1081,21 @@ onUnmounted(() => {
             <button type="submit" class="btn-primary" :disabled="saving">Lend</button>
           </div>
         </form>
-      </div>
-    </div>
+    </Modal>
 
-    <div v-if="showDetailModal" class="modal-overlay" @click.self="showDetailModal = false">
-      <div class="modal-content" style="max-width: 500px;">
-        <div class="modal-header">
-          <div style="display: flex; align-items: center; gap: 10px;">
-            <button v-if="modalView !== 'detail'" class="btn-secondary btn-small" style="padding: 4px 8px;"
-                    @click="modalView = 'detail'">
-              <ArrowLeft :size="16"/>
-            </button>
-            <h2 class="accent-text" style="display: flex; align-items: center; gap: 8px;">
-              <Lock v-if="modalView === 'detail' && selectedItem?.private" :size="20" style="color: #f59e0b;"/>
-              {{ detailModalTitle }}
-            </h2>
-          </div>
-          <X class="modal-close" :size="20" @click="showDetailModal = false"/>
+    <Modal :show="showDetailModal" @close="showDetailModal = false" :content-style="{ maxWidth: '500px' }">
+      <template #header>
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <button v-if="modalView !== 'detail'" class="btn-secondary btn-small" style="padding: 4px 8px;"
+                  @click="modalView = 'detail'">
+            <ArrowLeft :size="16"/>
+          </button>
+          <h2 class="accent-text" style="display: flex; align-items: center; gap: 8px;">
+            <Lock v-if="modalView === 'detail' && selectedItem?.private" :size="20" style="color: #f59e0b;"/>
+            {{ detailModalTitle }}
+          </h2>
         </div>
+      </template>
 
         <div v-if="modalView === 'detail'">
           <img v-if="selectedItem?.image" :src="selectedItem.image"
@@ -1523,17 +1480,10 @@ onUnmounted(() => {
             </div>
           </form>
         </div>
-
-      </div>
-    </div>
+    </Modal>
 
     <!-- Camera Modal -->
-    <div v-if="showCameraModal" class="modal-overlay" @click.self="closeCamera">
-      <div class="modal-content" style="max-width: 600px; padding: 20px; text-align: center;">
-        <div class="modal-header">
-          <h2 class="accent-text" style="margin-top: 0;">Capture Photo</h2>
-          <X class="modal-close" :size="20" @click="closeCamera"/>
-        </div>
+    <Modal :show="showCameraModal" title="Capture Photo" @close="closeCamera" :content-style="{ maxWidth: '600px', padding: '20px', textAlign: 'center' }">
         <div
             style="position: relative; width: 100%; aspect-ratio: 4/3; background: #000; border-radius: 12px; overflow: hidden; margin-bottom: 20px;">
           <video ref="videoRef" autoplay playsinline style="width: 100%; height: 100%; object-fit: cover;"></video>
@@ -1545,8 +1495,7 @@ onUnmounted(() => {
             Capture
           </button>
         </div>
-      </div>
-    </div>
+    </Modal>
 
   </div>
 </template>

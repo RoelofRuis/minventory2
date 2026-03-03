@@ -3,10 +3,11 @@
 import { computed, ref, nextTick, watch, onUnmounted } from 'vue';
 import { useAuthStore } from './stores/auth';
 import { useRoute } from 'vue-router';
-import { Rocket, Box, Eye, EyeOff, X, Settings, LogOut, Terminal, Trash2, Pencil, HelpCircle } from 'lucide-vue-next';
+import { Rocket, Box, Eye, EyeOff, Settings, LogOut, Terminal, Trash2, Pencil, HelpCircle } from 'lucide-vue-next';
 import axios from 'axios';
 import { logs, clearLogs } from './utils/logger';
 import {useSettings} from "./stores/settings.ts";
+import Modal from "./components/Modal.vue";
 
 const { showPrivate, editMode, isAuthenticated, setEditMode, togglePrivate, logoutSession } = useAuthStore();
 const { gridColumns, setGridColumns } = useSettings();
@@ -112,25 +113,6 @@ watch(() => route.path, (newPath) => {
 
 const questionsToggleLink = computed(() => route.path === '/artistic' ? lastMainPath.value : '/artistic');
 
-watch([showSettingsModal, showUnlockModal], ([s1, s2]) => {
-  if (s1 || s2) {
-    document.body.classList.add('modal-open');
-  } else {
-    nextTick(() => {
-      if (document.querySelectorAll('.modal-overlay').length === 0) {
-        document.body.classList.remove('modal-open');
-      }
-    });
-  }
-});
-
-onUnmounted(() => {
-  nextTick(() => {
-    if (document.querySelectorAll('.modal-overlay').length === 0) {
-      document.body.classList.remove('modal-open');
-    }
-  });
-});
 </script>
 
 <template>
@@ -163,12 +145,7 @@ onUnmounted(() => {
   <router-view></router-view>
 
   <!-- Settings Modal -->
-  <div v-if="showSettingsModal" class="modal-overlay" @click.self="showSettingsModal = false">
-    <div class="modal-content" style="max-width: 420px;">
-      <div class="modal-header">
-        <h2 class="accent-text">Settings</h2>
-        <X class="modal-close" :size="20" @click="showSettingsModal = false" />
-      </div>
+  <Modal :show="showSettingsModal" title="Settings" @close="showSettingsModal = false" :content-style="{ maxWidth: '420px' }">
       <div class="form-group" style="display:flex; align-items:center; justify-content: space-between; gap: 12px; margin-top: 12px;">
         <div style="display: flex; align-items: center; gap: 12px;">
           <div>
@@ -242,16 +219,10 @@ onUnmounted(() => {
           Logout
         </button>
       </div>
-    </div>
-  </div>
+  </Modal>
 
   <!-- Unlock Private Modal -->
-  <div v-if="showUnlockModal" class="modal-overlay" @click.self="closeUnlockModal">
-    <div class="modal-content" style="max-width: 400px;">
-      <div class="modal-header">
-        <h2 class="accent-text">{{ pendingEnableEdit ? 'Unlock for Editing' : 'Unlock Private Items' }}</h2>
-        <X class="modal-close" :size="20" @click="closeUnlockModal" />
-      </div>
+  <Modal :show="showUnlockModal" :title="pendingEnableEdit ? 'Unlock for Editing' : 'Unlock Private Items'" @close="closeUnlockModal" :content-style="{ maxWidth: '400px' }">
       <p class="silver-text" style="margin-bottom: 20px;">
         {{ pendingEnableEdit ? 'Please enter your password to enable editing.' : 'Please enter your password to reveal hidden items.' }}
       </p>
@@ -276,6 +247,5 @@ onUnmounted(() => {
           </button>
         </div>
       </form>
-    </div>
-  </div>
+  </Modal>
 </template>
