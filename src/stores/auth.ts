@@ -53,11 +53,17 @@ export function useAuthStore() {
         }
     };
 
-    const setEditMode = async (val: boolean) => {
+    const setEditMode = async (val: boolean, revealPrivate: boolean = true) => {
         editMode.value = val;
         localStorage.setItem('editMode', String(val));
-        // Enabling edit mode enables private view by default; disabling turns it off
-        await togglePrivate(val);
+        // Enabling edit mode enables private view by default if revealPrivate is true; disabling turns it off
+        if (val) {
+            if (revealPrivate) {
+                await togglePrivate(true);
+            }
+        } else {
+            await togglePrivate(false);
+        }
     };
 
 

@@ -19,6 +19,7 @@ const unlockError = ref('');
 const unlockPasswordInput = ref<HTMLInputElement | null>(null);
 const saving = ref(false);
 const pendingEnableEdit = ref(false);
+const revealHiddenItems = ref(true);
 const showLogs = ref(false);
 
 const getLogColor = (type: string) => {
@@ -44,6 +45,7 @@ const togglePrivateItems = async () => {
   if (!showPrivate.value) {
     unlockPassword.value = '';
     unlockError.value = '';
+    revealHiddenItems.value = true;
     showUnlockModal.value = true;
     nextTick(() => {
       unlockPasswordInput.value?.focus();
@@ -85,9 +87,10 @@ const confirmUnlock = async () => {
   unlockError.value = '';
   try {
     await axios.post('/api/auth/unlock-private', { password: unlockPassword.value });
-    await togglePrivate(true);
     if (pendingEnableEdit.value) {
-      await setEditMode(true);
+      await setEditMode(true, revealHiddenItems.value);
+    } else {
+      await togglePrivate(true);
     }
     closeUnlockModal();
   } catch (err) {
@@ -250,12 +253,21 @@ onUnmounted(() => {
         <X class="modal-close" :size="20" @click="closeUnlockModal" />
       </div>
       <p class="silver-text" style="margin-bottom: 20px;">
-        {{ pendingEnableEdit ? 'Please enter your password to enable editing. This also reveals hidden items.' : 'Please enter your password to reveal hidden items.' }}
+        {{ pendingEnableEdit ? 'Please enter your password to enable editing.' : 'Please enter your password to reveal hidden items.' }}
       </p>
       <form @submit.prevent="confirmUnlock">
         <div class="form-group">
           <label>Password</label>
           <input v-model="unlockPassword" type="password" required ref="unlockPasswordInput" @input="unlockError = ''" />
+        </div>
+        <div v-if="pendingEnableEdit" class="form-group" style="margin-top: 10px; border-top: 1px solid var(--border-color); padding-top: 15px; display: flex; align-items: center; gap: 15px; flex-wrap: wrap; margin-bottom: 20px;">
+          <label class="switch-container" style="margin-bottom: 0;">
+            <input type="checkbox" v-model="revealHiddenItems" />
+            <div class="switch-track">
+              <div class="switch-thumb"></div>
+            </div>
+            <span class="silver-text" style="font-size: 14px;">Also reveal hidden items</span>
+          </label>
         </div>
         <p v-if="unlockError" class="error-text">{{ unlockError }}</p>
         <div class="actions">
